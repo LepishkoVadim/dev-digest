@@ -35,8 +35,8 @@ export function HoverCard({
 
   // Position the fixed portal card from the trigger's viewport rect; flip up when
   // there isn't room below.
-  React.useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
+  const place = React.useCallback(() => {
+    if (!triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
     const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
     const flipUp = r.bottom + CARD_MAX_HEIGHT + 12 > window.innerHeight;
@@ -45,19 +45,24 @@ export function HoverCard({
         ? { position: "fixed", bottom: window.innerHeight - r.top + 6, left, width, zIndex: 1000 }
         : { position: "fixed", top: r.bottom + 6, left, width, zIndex: 1000 },
     );
-  }, [open, width]);
+  }, [width]);
 
-  // A rect that goes stale (scroll/resize) → just close.
+  React.useLayoutEffect(() => {
+    if (open) place();
+  }, [open, place]);
+
+  // Keep the card glued to the trigger on scroll/resize. Reposition (not close):
+  // scrolling INSIDE the card doesn't move the trigger, so its rect — and the
+  // card's position — stay put, and the popover no longer vanishes mid-scroll.
   React.useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
     return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
     };
-  }, [open]);
+  }, [open, place]);
 
   React.useEffect(() => () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);

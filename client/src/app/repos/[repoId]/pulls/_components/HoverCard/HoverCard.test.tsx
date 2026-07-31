@@ -26,4 +26,19 @@ describe("HoverCard", () => {
     fireEvent.mouseLeave(wrapper);
     await waitFor(() => expect(screen.queryByText("popover body")).toBeNull());
   });
+
+  it("stays open while its content is scrolled", () => {
+    const { container } = render(
+      <HoverCard trigger={<span>counts</span>}>
+        <div>popover body</div>
+      </HoverCard>,
+    );
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    expect(screen.getByText("popover body")).toBeInTheDocument();
+
+    // Scrolling repositions instead of closing — popover survives.
+    fireEvent.scroll(screen.getByText("popover body"));
+    fireEvent.scroll(window);
+    expect(screen.getByText("popover body")).toBeInTheDocument();
+  });
 });
