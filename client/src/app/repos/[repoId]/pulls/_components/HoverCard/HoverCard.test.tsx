@@ -17,7 +17,11 @@ describe("HoverCard", () => {
     expect(screen.queryByText("popover body")).toBeNull();
 
     fireEvent.mouseEnter(wrapper);
-    expect(screen.getByText("popover body")).toBeInTheDocument();
+    const body = screen.getByText("popover body");
+    expect(body).toBeInTheDocument();
+    // Rendered in a portal (under document.body), not inside the trigger wrapper,
+    // so it escapes the table's overflow:hidden.
+    expect(wrapper.contains(body)).toBe(false);
 
     fireEvent.mouseLeave(wrapper);
     await waitFor(() => expect(screen.queryByText("popover body")).toBeNull());
