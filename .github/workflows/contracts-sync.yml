@@ -1,0 +1,35 @@
+# contracts-sync — guards the single-source-of-truth invariant for the vendored
+# @devdigest/shared Zod contracts. server/src/vendor/shared is the source;
+# client/src/vendor/shared is a mirror. This fails the PR if they drift, telling
+# the author to run ./scripts/sync-shared.sh.
+name: contracts-sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - 'scripts/sync-shared.sh'
+      - '.github/workflows/contracts-sync.yml'
+  pull_request:
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - 'scripts/sync-shared.sh'
+      - '.github/workflows/contracts-sync.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: mirror in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/sync-shared.sh --check

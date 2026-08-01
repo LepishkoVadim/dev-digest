@@ -1,12 +1,14 @@
 # client — Specs index
 ↑ [CLAUDE.md](../CLAUDE.md)
 
-Behavior contracts for the UI. Empty for now.
+Behavior contracts for the UI. Coverage today is two-layered and executable — no
+prose specs are extracted yet:
 
-For real browser journeys the source of truth is the deterministic agent-browser
-suite in [`../../e2e`](../../e2e/README.md) — add UI-only specs here (e.g.
-component contracts, interaction specs) rather than duplicating e2e flows.
+| Contract | Source |
+|----------|--------|
+| Component & interaction behavior (vitest + jsdom, `fetch` mocked) | `src/**/_components/<Name>/*.test.tsx` |
+| End-to-end browser journeys (client + API + seeded DB) | [`../../e2e/specs`](../../e2e/README.md) |
 
-| Spec | Covers |
-|------|--------|
-| _(add specs here)_ | |
+Add a UI-only spec here only when a behavior needs a contract neither layer pins —
+a cross-page interaction rule, a loading/error-state contract, or an accessibility
+invariant — rather than duplicating an e2e flow.

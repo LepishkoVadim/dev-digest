@@ -1,0 +1,62 @@
+# lint — ESLint (flat config) across the three source packages. Formatting is
+# Prettier's job (root .prettierrc.json); ESLint only checks lint rules. Baseline
+# violations are `warn` (see each eslint.config.mjs), so this fails only on
+# NEW errors. client/server use pnpm; reviewer-core uses npm.
+name: lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'reviewer-core/**'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'reviewer-core/**'
+      - '.github/workflows/lint.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eslint:
+    name: eslint (${{ matrix.pkg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg: client
+            pm: pnpm
+          - pkg: server
+            pm: pnpm
+          - pkg: reviewer-core
+            pm: npm
+    defaults:
+      run:
+        working-directory: ${{ matrix.pkg }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: matrix.pm == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ matrix.pm }}
+          cache-dependency-path: ${{ matrix.pkg }}/${{ matrix.pm == 'pnpm' && 'pnpm-lock.yaml' || 'package-lock.json' }}
+
+      - run: ${{ matrix.pm == 'pnpm' && 'pnpm install --frozen-lockfile' || 'npm ci' }}
+
+      - run: ${{ matrix.pm }} run lint

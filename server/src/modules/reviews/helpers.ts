@@ -3,11 +3,32 @@
  * their arguments — no DB / network / `this`).
  */
 import type { Finding } from '@devdigest/shared';
+import { wrapUntrusted } from '@devdigest/reviewer-core';
+import type { SkillRow } from '../../db/rows.js';
 import type { FindingRow, PullRow, ReviewRow } from './repository.js';
 
 // reduceReviews + sliceDiff live in @devdigest/reviewer-core (pure engine logic
 // shared with the CI runner); re-exported here for backward-compatible imports.
 export { reduceReviews, sliceDiff } from '@devdigest/reviewer-core';
+
+/**
+ * Turn an agent's linked skills (ordered) into the prompt's `## Skills / rules`
+ * blocks. Disabled skills are dropped. A `manual` skill is authored in-house →
+ * its body is trusted and used raw; any other source (extracted / community /
+ * imported) is untrusted content, so it's wrapped with `wrapUntrusted` (which
+ * neutralises injection attempts inside the skill body).
+ */
+export function resolveSkillBlocks(
+  linked: { skill: Pick<SkillRow, 'name' | 'body' | 'enabled' | 'source'> }[],
+): string[] {
+  return linked
+    .filter((l) => l.skill.enabled === true)
+    .map((l) =>
+      l.skill.source === 'manual'
+        ? l.skill.body
+        : wrapUntrusted(`skill:${l.skill.name}`, l.skill.body),
+    );
+}
 
 export interface ReviewDtoFinding extends Finding {
   review_id: string;

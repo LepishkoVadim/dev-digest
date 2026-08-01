@@ -19,6 +19,24 @@
     "selectPrompt": {
       "title": "Select a skill",
       "body": "Pick a skill on the left to preview its body."
+    },
+    "createFromScratch": "Create from scratch"
+  },
+  "create": {
+    "title": "Create a skill",
+    "subtitle": "Author a skill body directly. Manual skills start enabled.",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "defaultName": "untitled-skill",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "pr-quality-rubric",
+      "description": "Description",
+      "descriptionPlaceholder": "What this skill checks…",
+      "type": "Type",
+      "body": "Skill body (Markdown)",
+      "bodyPlaceholder": "# Rule\nDescribe the rule…"
     }
   },
   "detail": {
@@ -28,6 +46,54 @@
     "notFound": {
       "title": "Skill not found",
       "body": "It may have been deleted."
+    }
+  },
+  "editor": {
+    "runOnEvals": "Run on evals",
+    "tabs": {
+      "config": "Config",
+      "preview": "Preview",
+      "versions": "Versions",
+      "stats": "Stats",
+      "evals": "Evals"
+    },
+    "config": {
+      "title": "Configuration",
+      "tokenEstimate": "~{count} tokens",
+      "unsaved": "• unsaved",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved (v{version})",
+      "savedToast": "Saved skill (v{version})."
+    },
+    "preview": {
+      "title": "Preview",
+      "subtitle": "Rendered as the reviewing agent receives it."
+    },
+    "versions": {
+      "intro": "Every save snapshots the body so eval runs stay reproducible.",
+      "current": "Current",
+      "diff": "Diff",
+      "restore": "Restore",
+      "restoredToast": "Restored to a new version (v{version}).",
+      "diffTitle": "Diff — v{version} vs current",
+      "diffSubtitle": "Lines removed from this version and added in the current body.",
+      "emptyTitle": "No versions yet",
+      "emptyBody": "Save the body to create the first snapshot."
+    },
+    "stats": {
+      "usedBy": "USED BY",
+      "findings30d": "FINDINGS 30D",
+      "acceptRate": "ACCEPT RATE",
+      "agentsUsing": "AGENTS USING THIS SKILL",
+      "noAgents": "No agents use this skill yet.",
+      "findingsByCategory": "FINDINGS BY CATEGORY",
+      "noFindings": "No findings recorded yet.",
+      "emptyTitle": "No stats yet"
+    },
+    "evals": {
+      "title": "Evals coming soon",
+      "body": "Skill evals aren't available yet."
     }
   },
   "drawer": {
@@ -72,6 +138,7 @@
     "import": "Import"
   },
   "listItem": {
+    "noDescription": "No description",
     "needsVetting": "needs vetting",
     "vettingTitle": "Untrusted source — vet before enabling",
     "type": {

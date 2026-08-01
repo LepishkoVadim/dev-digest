@@ -1,0 +1,46 @@
+# audit — weekly dependency vulnerability signal per package. Deliberately
+# SCHEDULE-ONLY (no push/PR triggers): the tree already carries known HIGH/critical
+# advisories in transitive dev-tooling (vitest / testcontainers / next), so gating
+# every PR on them would be pure noise. This surfaces NEW or worsening advisories
+# as a weekly red run in the Actions tab without blocking anyone. Fix opportunistically
+# (bump the offending dep) or wire up Dependabot for auto-PRs.
+name: audit
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: audit (${{ matrix.pkg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg: client
+            pm: pnpm
+          - pkg: server
+            pm: pnpm
+          - pkg: reviewer-core
+            pm: npm
+    defaults:
+      run:
+        working-directory: ${{ matrix.pkg }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: matrix.pm == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: ${{ matrix.pm }} audit --audit-level=high

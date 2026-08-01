@@ -123,9 +123,10 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     await getContext(container, req);
     const trace = await service.getRunTrace(req.params.id);
     if (!trace) throw new NotFoundError('Run trace not found');
-    // Cost is computed on read from tokens × model price (also backfills traces
-    // stored before cost_usd existed). null when the model has no known price.
-    trace.stats.cost_usd = runCostUsd(trace.config.model, trace.stats.tokens_in, trace.stats.tokens_out);
+    // Prefer the real cost the engine stored in the trace (provider usage.cost);
+    // estimate from tokens only to backfill traces saved before cost was captured.
+    trace.stats.cost_usd =
+      trace.stats.cost_usd ?? runCostUsd(trace.config.model, trace.stats.tokens_in, trace.stats.tokens_out);
     return trace;
   });
 

@@ -91,7 +91,13 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach.",
+    "globallyDisabled": "globally disabled — body won't reach the prompt",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "emptyTitle": "No skills yet",
+    "emptyBody": "Skills are reusable review blocks appended to the agent's prompt. Create one in the Skills Lab, then attach it here.",
+    "emptyCta": "Go to Skills Lab"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

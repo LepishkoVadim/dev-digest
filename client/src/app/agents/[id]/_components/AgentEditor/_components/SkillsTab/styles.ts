@@ -1,0 +1,68 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for SkillsTab. Row layout mirrors the Skills-tab mockup:
+    drag handle · checkbox · mono name · right-aligned type badge. */
+export const s = {
+  wrap: { maxWidth: 880, padding: "20px 4px" } satisfies CSSProperties,
+  header: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6 } satisfies CSSProperties,
+  h2: { fontSize: 18, fontWeight: 700 } satisfies CSSProperties,
+  countPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "2px 9px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--accent)",
+    background: "color-mix(in srgb, var(--accent) 16%, transparent)",
+  } satisfies CSSProperties,
+  filter: { marginLeft: "auto", width: 220 } satisfies CSSProperties,
+  hint: { fontSize: 12.5, color: "var(--text-muted)", margin: "6px 0 16px", lineHeight: 1.5 } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 6 } satisfies CSSProperties,
+
+  row: (linked: boolean, dragging: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "11px 14px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: linked ? "color-mix(in srgb, var(--accent) 8%, var(--bg-elevated))" : "var(--bg-elevated)",
+    borderColor: linked ? "color-mix(in srgb, var(--accent) 35%, var(--border))" : "var(--border)",
+    opacity: dragging ? 0.4 : 1,
+    cursor: linked ? "grab" : "default",
+    transition: "background .12s, border-color .12s",
+  }),
+  handle: (draggable: boolean): CSSProperties => ({
+    display: "inline-flex",
+    color: draggable ? "var(--text-muted)" : "var(--border)",
+    cursor: draggable ? "grab" : "default",
+    flexShrink: 0,
+  }),
+  checkbox: (checked: boolean): CSSProperties => ({
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    flexShrink: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    border: checked ? "1px solid var(--accent)" : "1.5px solid var(--border-strong, var(--border))",
+    background: checked ? "var(--accent)" : "transparent",
+    color: "#fff",
+    transition: "background .12s, border-color .12s",
+  }),
+  name: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: "var(--font-mono, ui-monospace, monospace)",
+    fontSize: 13.5,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  dimName: { color: "var(--text-muted)" } satisfies CSSProperties,
+} as const;

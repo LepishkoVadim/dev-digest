@@ -7,7 +7,7 @@ import { seed } from '../src/db/seed.js';
 import { MockLLMProvider, MockEmbedder, MockGitClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
-import type { Review } from '@devdigest/shared';
+import type { Review, LLMProvider } from '@devdigest/shared';
 
 const hasDocker = await dockerAvailable();
 const d = hasDocker ? describe : describe.skip;
@@ -202,12 +202,67 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     expect(trace.config.model).toBe('gpt-4.1');
     expect(trace.stats.grounding).toBe('1/2 passed');
     expect(trace.log.length).toBeGreaterThan(0);
+    // Real provider cost (MockLLMProvider reports 0.001) flows through — NOT a
+    // token×price re-estimate at read time.
+    expect(trace.stats.cost_usd).toBe(0.001);
 
     // agent_runs row populated for A5 to aggregate
     const [run] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
     expect(run!.status).toBe('done');
     expect(run!.findingsCount).toBe(1);
     expect(run!.grounding).toBe('1/2 passed');
+    // The real cost is persisted on the run row (not left null / re-estimated).
+    expect(run!.costUsd).toBe(0.001);
+
+    await app.close();
+  });
+
+  it('marks the run failed (never silently) when the LLM throws mid-review', async () => {
+    // A provider that blows up inside completeStructured — exercises the
+    // run-executor catch path: status→failed, error persisted, no review written.
+    const failing: LLMProvider = {
+      id: 'openai',
+      async completeStructured() {
+        throw new Error('llm exploded');
+      },
+      async listModels() {
+        return [];
+      },
+      async complete() {
+        throw new Error('not used');
+      },
+      async embed() {
+        return [];
+      },
+    };
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        llm: { openai: failing },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Boom', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    const runs = await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const run = runs.find((r) => r.agentId === agent.id) ?? runs[0];
+    expect(run!.status).toBe('failed');
+    expect(run!.error).toContain('llm exploded');
+
+    // A failed run persists no review.
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(0);
 
     await app.close();
   });

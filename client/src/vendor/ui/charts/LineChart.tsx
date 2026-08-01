@@ -1,3 +1,4 @@
+"use client";
 /* LineChart — multi-series line chart on Recharts. */
 import React from "react";
 import {

@@ -1,3 +1,4 @@
+"use client";
 /* Donut — ring chart with a legend, on Recharts. */
 import React from "react";
 import { PieChart, Pie, Cell } from "recharts";

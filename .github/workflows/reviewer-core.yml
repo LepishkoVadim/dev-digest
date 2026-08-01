@@ -46,4 +46,5 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm test
+      # coverage = tests + the ratchet threshold gate (see vitest.config.ts)
+      - run: npm run coverage

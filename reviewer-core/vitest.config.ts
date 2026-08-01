@@ -13,5 +13,16 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts'],
+      // RATCHET floor, not an aspiration. Current ~64%; the thin src/llm SDK
+      // wrappers are covered at the server/integration layer (MockLLMProvider),
+      // so a global 80% would demand duplicate unit tests. Locks the floor so
+      // coverage of the critical engine can only go up. Raise as tests are added.
+      thresholds: { lines: 60, statements: 60, functions: 60, branches: 60 },
+    },
   },
 });

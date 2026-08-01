@@ -7,7 +7,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "openai": "^4.77.0",
@@ -15,8 +17,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^2.1.8"
   }
 }
