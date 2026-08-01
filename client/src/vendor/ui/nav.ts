@@ -23,7 +23,26 @@ export const NAV: NavGroup[] = [
     section: "WORKSPACE",
     items: [
       { key: "pulls", label: "Pull Requests", icon: "GitPullRequest", href: "/repos/:repoId/pulls", gKey: "p" },
+      { key: "onboarding-tour", label: "Onboarding Tour", icon: "Play", href: "/onboarding" },
+      { key: "context", label: "Project Context", icon: "Folder", href: "/project-context" },
+    ],
+  },
+  {
+    section: "SKILLS LAB",
+    items: [
+      { key: "skills", label: "Skills", icon: "Sparkles", href: "/skills", gKey: "s" },
       { key: "agents", label: "Agents", icon: "Cpu", href: "/agents", gKey: "a" },
+      { key: "conventions", label: "Conventions", icon: "ListChecks", href: "/conventions" },
+      { key: "eval", label: "Eval Dashboard", icon: "Gauge", href: "/evals" },
+    ],
+  },
+  {
+    section: "GLOBAL",
+    items: [
+      { key: "memory", label: "Memory", icon: "Database", href: "/memory" },
+      { key: "multi-agent", label: "Multi-Agent Review", icon: "Users", href: "/multi-agent" },
+      { key: "agent-performance", label: "Agent Performance", icon: "Activity", href: "/agent-performance" },
+      { key: "ci-runs", label: "CI Runs", icon: "Workflow", href: "/ci-runs" },
     ],
   },
 ];
@@ -52,6 +71,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { keys: "⌘K", label: "Open command palette", group: "Global" },
   { keys: "?", label: "Show keyboard shortcuts", group: "Global" },
   { keys: "g p", label: "Go to Pull Requests", group: "Navigation" },
+  { keys: "g s", label: "Go to Skills", group: "Navigation" },
   { keys: "g a", label: "Go to Agents", group: "Navigation" },
   { keys: "j / k", label: "Next / previous finding", group: "Findings" },
   { keys: "a", label: "Accept finding", group: "Findings" },

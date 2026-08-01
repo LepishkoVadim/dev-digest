@@ -40,6 +40,17 @@ export function withGitHubToken(url: string, token: string): string {
   return url;
 }
 
+/**
+ * Strip a known secret (the GitHub PAT) from text before it's logged or
+ * persisted. `withGitHubToken` embeds the token into the clone URL, so a failed
+ * `git clone` can echo it back in stderr — redact it at the source. split/join
+ * replaces every occurrence with no regex-escaping concerns.
+ */
+export function redactToken(text: string, token: string | null | undefined): string {
+  if (!token) return text;
+  return text.split(token).join('***');
+}
+
 /** Map a persisted repo row to the API `Repo` DTO. */
 export function toRepoDto(row: typeof t.repos.$inferSelect): Repo {
   return {

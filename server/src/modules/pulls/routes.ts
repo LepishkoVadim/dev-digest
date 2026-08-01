@@ -154,12 +154,14 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           model: t.agentRuns.model,
           tokensIn: t.agentRuns.tokensIn,
           tokensOut: t.agentRuns.tokensOut,
+          costUsd: t.agentRuns.costUsd,
         })
         .from(t.agentRuns)
         .where(inArray(t.agentRuns.prId, prIds));
       for (const run of runRows) {
         if (!run.prId) continue;
-        const cost = runCostUsd(run.model, run.tokensIn, run.tokensOut);
+        // Prefer the real persisted cost; estimate for legacy rows only.
+        const cost = run.costUsd ?? runCostUsd(run.model, run.tokensIn, run.tokensOut);
         if (cost == null) continue;
         costByPr.set(run.prId, (costByPr.get(run.prId) ?? 0) + cost);
       }

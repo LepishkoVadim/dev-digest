@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, resolveSkillBlocks } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import { estimateCost } from '../../adapters/llm/pricing.js';
 
@@ -184,6 +184,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Agent's linked skills (ordered) → prompt `## Skills / rules` blocks.
+      // Disabled skills are dropped; non-manual bodies are wrapped as untrusted.
+      const blocks = resolveSkillBlocks(await this.agents.linkedSkills(agent.id));
+      if (blocks.length) runLog.info(`${blocks.length} skill(s) attached to the prompt`);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -204,6 +209,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Agent's enabled skills as prompt rules (omitted when none).
+        ...(blocks.length ? { skills: blocks } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -211,7 +218,7 @@ export class ReviewRunExecutor {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
         },
       });
-      const { tokensIn, tokensOut, grounding } = outcome;
+      const { tokensIn, tokensOut, grounding, costUsd } = outcome;
 
       const keptFindings = outcome.review.findings;
 
@@ -246,6 +253,7 @@ export class ReviewRunExecutor {
         durationMs,
         tokensIn,
         tokensOut,
+        costUsd,
         findingsCount: findingRows.length,
         grounding,
         score: outcome.review.score,
@@ -268,7 +276,11 @@ export class ReviewRunExecutor {
           tokens_out: tokensOut,
           findings: findingRows.length,
           grounding,
-          cost_usd: estimateCost(agent.model, tokensIn, tokensOut),
+          // Prefer the REAL cost the engine accumulated from the provider
+          // (e.g. OpenRouter's usage.cost); fall back to the price-book estimate
+          // only when the provider reported none. Re-estimating here discarded
+          // the real figure.
+          cost_usd: costUsd ?? estimateCost(agent.model, tokensIn, tokensOut),
         },
         prompt_assembly: outcome.assembly,
         tool_calls: outcome.chunks.map((c) => ({

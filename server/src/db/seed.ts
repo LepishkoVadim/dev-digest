@@ -6,6 +6,7 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -211,6 +212,18 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description:
+        'Reviews test quality: uncovered branches, missing edge cases, over-mocking, and flaky-test smells.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +231,172 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- skills (the Skills feature) ----
+  // Idempotent by (workspace, name); each also gets a matching skill_versions v1 row.
+  const seedSkills: Array<Omit<typeof t.skills.$inferInsert, 'workspaceId'>> = [
+    {
+      name: 'pr-quality-rubric',
+      description: 'A scoring rubric for PR quality across correctness, security, tests, and scope.',
+      type: 'rubric',
+      source: 'manual',
+      enabled: true,
+      version: 1,
+      body: `# PR Quality Rubric
+Score the change on each dimension; a failure on any single dimension caps the PR.
+
+- **Correctness** — does the change do what it claims, on the happy path AND the
+  edge cases (empty/null/boundary inputs, error paths)? No inverted conditionals,
+  no swallowed errors, no broken caller contracts.
+- **Security** — no secrets in the diff, input validated at trust boundaries,
+  parameterized queries, fail-closed defaults, no new injection/SSRF/authz gaps.
+- **Tests** — new behaviour and new branches are covered by tests that would fail
+  if the code were wrong; no over-mocking, no flaky-test smells.
+- **Scope** — the diff does one thing; no unrelated refactors, no dead code, no
+  speculative abstraction, no drive-by config churn.`,
+    },
+    {
+      name: 'no-then-chains',
+      description: 'House rule: use async/await instead of Promise .then() chains.',
+      type: 'convention',
+      source: 'extracted',
+      enabled: true,
+      version: 1,
+      body: `# Convention: no \`.then()\` chains
+Always use \`async/await\` instead of \`.then()\`/\`.catch()\` promise chains.
+
+- Flag any \`.then(\` / \`.catch(\` / \`.finally(\` added in the diff.
+- Rewrite \`fetch(url).then(r => r.json())\` as \`const r = await fetch(url); const data = await r.json();\`.
+- Rationale: await keeps control flow linear, error handling in one \`try/catch\`,
+  and stack traces intact. Chains hide missed rejections and nest quickly.`,
+    },
+    {
+      name: 'secret-leakage-gate',
+      description: 'Detects committed secret patterns (sk_live, service_role, NEXT_PUBLIC_) in diffs.',
+      type: 'security',
+      source: 'community',
+      enabled: true,
+      version: 1,
+      body: `# Secret Leakage Gate
+Block any diff that introduces a committed secret.
+
+- **\`sk_live\`** — Stripe live secret keys (also \`sk_test\`, \`rk_live\`).
+- **\`service_role\`** — Supabase service-role keys / JWTs (full DB bypass).
+- **\`NEXT_PUBLIC_\`** — a public env var holding a value that is actually a
+  secret (anything ending up in the client bundle must never be a real secret).
+
+For any match: CRITICAL, cite file:line, tell the author to move the value to
+\`~/.devdigest/secrets.json\` / env and ROTATE the exposed credential. Never echo the
+secret value back in the finding.`,
+    },
+    {
+      name: 'lethal-trifecta',
+      description:
+        'Flags PRs that combine private-data access, untrusted input, and an exfiltration path.',
+      type: 'security',
+      source: 'community',
+      enabled: true,
+      version: 1,
+      body: `# Lethal Trifecta
+Flag a change only when ONE flow combines all three components:
+
+1. **Untrusted input** — PR body, web page, file, or tool output the agent ingests.
+2. **Private-data access** — the same agent/flow can read secrets, private repos,
+   PII, or internal data.
+3. **Exfiltration path** — an outbound call, tool, or attacker-readable output the
+   data can escape through.
+
+Name a concrete file:line for each of the three. A normal authenticated
+\`request → DB read → JSON response\` is NOT a trifecta — that is ordinary access
+control. When any component is missing or speculative, downgrade to a normal
+finding. A false trifecta is worse than none.`,
+    },
+    {
+      name: 'phantom-api-gate',
+      description:
+        'Detects imports of functions/modules that do not exist in the repo. Imported, unvetted.',
+      type: 'security',
+      source: 'extracted',
+      enabled: false,
+      version: 1,
+      body: `# Phantom API Gate
+Detect "phantom" / hallucinated imports: code that imports a module, function, or
+export that does not actually exist in the repository or its dependencies.
+
+- Flag \`import { foo } from './bar'\` where \`bar\` has no \`foo\` export.
+- Flag imports of packages absent from \`package.json\`.
+- Flag calls to methods that do not exist on the imported symbol.
+
+Rationale: hallucinated APIs are a common LLM-authored-PR failure and, when the
+name collides with a squatted package, a supply-chain risk.`,
+    },
+    {
+      name: 'test-coverage-nudge',
+      description: 'Suggests tests when new branches lack coverage.',
+      type: 'custom',
+      source: 'manual',
+      enabled: true,
+      version: 1,
+      body: `# Test Coverage Nudge
+When the diff adds a new branch (\`if\`/\`else\`, \`switch\` case, ternary, \`try/catch\`,
+early return) that no test in the diff exercises, suggest a test.
+
+- Name the specific untested branch and the input that would reach it.
+- Keep it a SUGGESTION unless the untested branch is an error/failure path with real
+  defect risk — then WARNING.
+- Do not demand tests for trivial one-liners or pure type changes.`,
+    },
+  ];
+  for (const s of seedSkills) {
+    let [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, s.name)));
+    if (!existing) {
+      [existing] = await db
+        .insert(t.skills)
+        .values({ ...s, workspaceId })
+        .returning();
+      await db
+        .insert(t.skillVersions)
+        .values({ skillId: existing!.id, version: 1, body: s.body })
+        .onConflictDoNothing();
+    }
+  }
+
+  // ---- link skills to agents (agent_skills, order = index) ----
+  const skillIdByName = new Map(
+    (
+      await db
+        .select({ id: t.skills.id, name: t.skills.name })
+        .from(t.skills)
+        .where(eq(t.skills.workspaceId, workspaceId))
+    ).map((s) => [s.name, s.id]),
+  );
+  const agentIdByName = new Map(
+    (
+      await db
+        .select({ id: t.agents.id, name: t.agents.name })
+        .from(t.agents)
+        .where(eq(t.agents.workspaceId, workspaceId))
+    ).map((a) => [a.name, a.id]),
+  );
+  const links: Array<{ agent: string; skills: string[] }> = [
+    { agent: 'Security Reviewer', skills: ['pr-quality-rubric', 'secret-leakage-gate', 'lethal-trifecta'] },
+    { agent: 'Test Quality Reviewer', skills: ['test-coverage-nudge', 'pr-quality-rubric'] },
+  ];
+  for (const { agent, skills } of links) {
+    const agentId = agentIdByName.get(agent);
+    if (!agentId) continue;
+    for (const [order, skillName] of skills.entries()) {
+      const skillId = skillIdByName.get(skillName);
+      if (!skillId) continue;
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId, skillId, order })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

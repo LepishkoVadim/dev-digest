@@ -71,7 +71,9 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
-    cost_usd: runCostUsd(run.model, run.tokensIn, run.tokensOut),
+    // Prefer the real persisted cost; estimate only for rows saved before the
+    // column existed (run.costUsd null).
+    cost_usd: run.costUsd ?? runCostUsd(run.model, run.tokensIn, run.tokensOut),
     findings_count: run.findingsCount,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
@@ -161,6 +163,8 @@ export async function completeAgentRun(
     tokensOut: number;
     findingsCount: number;
     grounding: string;
+    /** Real provider cost (USD); null when unknown → readers estimate from tokens. */
+    costUsd?: number | null;
     /** Review score (0-100); null on failed/cancelled runs. */
     score?: number | null;
     /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
@@ -176,6 +180,7 @@ export async function completeAgentRun(
       durationMs: values.durationMs,
       tokensIn: values.tokensIn,
       tokensOut: values.tokensOut,
+      costUsd: values.costUsd ?? null,
       findingsCount: values.findingsCount,
       grounding: values.grounding,
       score: values.score ?? null,

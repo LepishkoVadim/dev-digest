@@ -6,6 +6,8 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 
 | Skill | Scope | Description |
 |-------|-------|-------------|
+| [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR gate: dispatches lens skills over the diff by scope + deterministic checks (secret/arch/contract); blocks the PR on any critical finding |
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Layer boundaries, inward-only dependency rule, file placement; enforced via dependency-cruiser (`pnpm arch:check`) |
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |

@@ -157,6 +157,8 @@ export class ReviewRepository {
       tokensOut: number;
       findingsCount: number;
       grounding: string;
+      /** Real provider cost (USD); null when unknown → readers estimate. */
+      costUsd?: number | null;
       /** Review score (0-100); null on failed/cancelled runs. */
       score?: number | null;
       /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */

@@ -2,7 +2,7 @@ import type { Container } from '../../platform/container.js';
 import { type Repo } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
 import { RepoRepository } from './repository.js';
-import { parseRepoUrl, withGitHubToken, toRepoDto } from './helpers.js';
+import { parseRepoUrl, withGitHubToken, toRepoDto, redactToken } from './helpers.js';
 import {
   CLONE_JOB_KIND,
   CLONE_DEPTH,
@@ -52,9 +52,18 @@ export class RepoService {
     const { repoId, owner, name, url } = payload;
     const token = await this.container.secrets.get(GITHUB_TOKEN_SECRET);
     const cloneUrl = token ? withGitHubToken(url, token) : url;
-    const { path } = await this.container.git.clone({ owner, name }, cloneUrl, {
-      depth: CLONE_DEPTH,
-    });
+    let path: string;
+    try {
+      ({ path } = await this.container.git.clone({ owner, name }, cloneUrl, {
+        depth: CLONE_DEPTH,
+      }));
+    } catch (err) {
+      // git echoes the (tokenized) remote URL in stderr — redact the PAT before
+      // it reaches JobRunner, which persists error.message on the failed job.
+      const e = err as Error;
+      e.message = redactToken(e.message, token);
+      throw e;
+    }
     await this.repo.updateClonePath(repoId, path);
 
     // T2.2 — kick off the indexer in the background. ENQUEUE (not call) so the

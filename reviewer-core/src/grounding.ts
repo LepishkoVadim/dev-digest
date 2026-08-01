@@ -29,8 +29,12 @@ export function buildLineIndex(diff: UnifiedDiff): Map<string, Set<number>> {
       if (h.newLineNumbers && h.newLineNumbers.length > 0) {
         for (const n of h.newLineNumbers) set.add(n);
       } else {
-        // fall back to the hunk's declared new range
-        for (let n = h.newStart; n < h.newStart + Math.max(h.newLines, 1); n++) set.add(n);
+        // Fall back to the hunk's declared new range. NOT Math.max(newLines, 1):
+        // a pure-deletion hunk (newLines === 0) has no new-side lines to comment
+        // on, so it must contribute NOTHING — otherwise it fabricates line
+        // `newStart` into the index and a finding citing it wrongly survives the
+        // gate (a hallucination that should be dropped).
+        for (let n = h.newStart; n < h.newStart + h.newLines; n++) set.add(n);
       }
     }
     idx.set(f.path, set);
