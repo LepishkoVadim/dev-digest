@@ -85,6 +85,13 @@
       "when": 1785605846476,
       "tag": "0011_lying_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785611736635,
+      "tag": "0012_clammy_firestar",
+      "breakpoints": true
     }
   ]
 }

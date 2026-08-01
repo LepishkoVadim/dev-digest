@@ -73,8 +73,10 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'conventions',
     label: 'Conventions',
     description: 'Extracts coding conventions from the repo.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-5.4',
+    // Cheap extraction model (same tier as onboarding) — the sampling + code-side
+    // evidence gate do the heavy lifting, so a small model is enough here.
+    defaultProvider: 'openrouter',
+    defaultModel: 'deepseek/deepseek-v4-flash',
   },
 ];
 
