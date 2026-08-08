@@ -145,6 +145,10 @@ export const ConventionCandidate = z.object({
   id: z.string(),
   rule: z.string(),
   evidence_path: z.string(),
+  // 1-based line where the verified snippet starts — used to deep-link the
+  // evidence to GitHub (`.../blob/<branch>/<path>#L<line>`). Null for rows
+  // whose line could not be resolved.
+  evidence_line: z.number().int().nullish(),
   evidence_snippet: z.string(),
   confidence: z.number().min(0).max(1),
   accepted: z.boolean(),
