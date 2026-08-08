@@ -4,16 +4,27 @@ import { NextIntlClientProvider } from "next-intl";
 import type { SmartDiff, PrFile } from "@devdigest/shared";
 import messages from "../../../../messages/en/shell.json";
 
-// Mock the data hook so the component renders synchronously without fetch.
+// Mock the data hooks so the component renders synchronously without fetch.
 const useSmartDiff = vi.fn();
+const usePrReviews = vi.fn<() => { data: unknown[] }>(() => ({ data: [] }));
 vi.mock("@/lib/hooks/smart-diff", () => ({ useSmartDiff: () => useSmartDiff() }));
+vi.mock("@/lib/hooks/reviews", () => ({ usePrReviews: () => usePrReviews() }));
 
 import { SmartDiffViewer } from "./SmartDiffViewer";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  usePrReviews.mockReturnValue({ data: [] });
+});
 
+// core file patch has two added lines so findings on lines 1 and 2 render.
 const FILES: PrFile[] = [
-  { path: "src/middleware/ratelimit.ts", additions: 84, deletions: 0, patch: "@@ -1,1 +1,1 @@\n+const x = 1;" },
+  {
+    path: "src/middleware/ratelimit.ts",
+    additions: 84,
+    deletions: 0,
+    patch: "@@ -0,0 +1,2 @@\n+const a = 1;\n+const b = 2;",
+  },
   { path: "package-lock.json", additions: 92, deletions: 24, patch: "@@ -1,1 +1,1 @@\n+dep" },
 ];
 
@@ -21,7 +32,7 @@ const SMART_DIFF: SmartDiff = {
   groups: [
     {
       role: "core",
-      files: [{ path: "src/middleware/ratelimit.ts", additions: 84, deletions: 0, finding_lines: [1], pseudocode_summary: null }],
+      files: [{ path: "src/middleware/ratelimit.ts", additions: 84, deletions: 0, finding_lines: [1, 2], pseudocode_summary: null }],
     },
     {
       role: "boilerplate",
@@ -30,6 +41,17 @@ const SMART_DIFF: SmartDiff = {
   ],
   split_suggestion: { too_big: false, total_lines: 200, proposed_splits: [] },
 };
+
+// Two findings on the core file — one CRITICAL (line 1), one SUGGESTION (line 2).
+const REVIEWS = [
+  {
+    kind: "review",
+    findings: [
+      { file: "src/middleware/ratelimit.ts", start_line: 1, end_line: 1, severity: "CRITICAL" },
+      { file: "src/middleware/ratelimit.ts", start_line: 2, end_line: 2, severity: "SUGGESTION" },
+    ],
+  },
+];
 
 function renderViewer() {
   return render(
@@ -40,31 +62,51 @@ function renderViewer() {
 }
 
 describe("SmartDiffViewer", () => {
-  it("renders Core logic before Boilerplate and shows the findings badge", () => {
+  it("renders Core logic before Boilerplate", () => {
     useSmartDiff.mockReturnValue({ data: SMART_DIFF, isError: false });
     renderViewer();
-
-    const core = screen.getByText("Core logic");
-    const boilerplate = screen.getByText("Boilerplate");
-    // Core group appears earlier in the DOM than Boilerplate.
+    // Role labels appear in both the file nav and the group headers — compare first occurrences.
+    const core = screen.getAllByText("Core logic")[0]!;
+    const boilerplate = screen.getAllByText("Boilerplate")[0]!;
     expect(core.compareDocumentPosition(boilerplate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    // The core file has a finding → its clickable badge renders.
-    expect(screen.getByText("1 findings")).toBeInTheDocument();
   });
 
-  it("keeps the boilerplate group collapsed (lock file hidden by default)", () => {
+  it("badge counts FINDINGS (2), not flagged lines, and highlights each by severity", () => {
+    useSmartDiff.mockReturnValue({ data: SMART_DIFF, isError: false });
+    usePrReviews.mockReturnValue({ data: REVIEWS });
+    renderViewer();
+
+    // Two findings → "2 findings" (even though finding_lines could differ).
+    expect(screen.getByText("2 findings")).toBeInTheDocument();
+    // Per-line severity labels from the design: blocker (CRITICAL) + suggestion.
+    expect(screen.getByText("blocker")).toBeInTheDocument();
+    expect(screen.getByText("suggestion")).toBeInTheDocument();
+  });
+
+  it("shows a findings summary strip (SeverityBadge tally) and a searchable file nav", () => {
+    useSmartDiff.mockReturnValue({ data: SMART_DIFF, isError: false });
+    usePrReviews.mockReturnValue({ data: REVIEWS });
+    renderViewer();
+
+    // Summary strip: one Critical + one Suggestion.
+    expect(screen.getByText("Critical")).toBeInTheDocument();
+    expect(screen.getByText("Suggestion")).toBeInTheDocument();
+    // File nav lists files by basename + a filter box.
+    expect(screen.getByText("ratelimit.ts")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Filter files…")).toBeInTheDocument();
+  });
+
+  it("keeps the boilerplate group collapsed (its diff hidden by default)", () => {
     useSmartDiff.mockReturnValue({ data: SMART_DIFF, isError: false });
     renderViewer();
-    // Core file card header is visible; the collapsed boilerplate file is not.
-    expect(screen.getByText("src/middleware/ratelimit.ts")).toBeInTheDocument();
-    expect(screen.queryByText("package-lock.json")).not.toBeInTheDocument();
+    // Core file diff is rendered (group open); boilerplate diff body is not.
+    expect(screen.getByText("const a = 1;")).toBeInTheDocument();
+    expect(screen.queryByText("dep")).not.toBeInTheDocument();
   });
 
   it("falls back to the flat diff when Smart Diff errors", () => {
     useSmartDiff.mockReturnValue({ data: undefined, isError: true });
     renderViewer();
-    // No group headers; the flat viewer still lists the file.
     expect(screen.queryByText("Core logic")).not.toBeInTheDocument();
     expect(screen.getByText("src/middleware/ratelimit.ts")).toBeInTheDocument();
   });

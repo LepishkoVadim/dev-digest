@@ -3,9 +3,12 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
+import { Icon, SEV } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
+import type { Severity } from "../severity";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
@@ -14,18 +17,22 @@ export function CodeLine({
   path,
   threads,
   commenting,
-  isFinding,
+  severity,
+  severityLabel,
   anchorId,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
-  /** True when a review finding covers this line — tints it and adds an accent bar. */
-  isFinding?: boolean;
+  /** Severity of the finding covering this line — tints the row + accent bar. */
+  severity?: Severity;
+  /** When set, shows a right-aligned severity label (one per finding, on its start line). */
+  severityLabel?: Severity;
   /** DOM id set on the row so a findings badge can scroll to it. */
   anchorId?: string;
 }) {
+  const t = useTranslations("shell");
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
 
@@ -40,6 +47,7 @@ export function CodeLine({
   const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "−" : "";
   const target = commenting?.canComment ? commentTargetFor(ln) : null;
   const showAdd = hover && !!target && !composing;
+  const LabelIcon = severityLabel ? Icon[SEV[severityLabel].icon] : null;
 
   return (
     <div
@@ -50,11 +58,11 @@ export function CodeLine({
     >
       <div
         style={
-          isFinding
+          severity
             ? {
                 ...lineRowFor(ln.kind),
-                boxShadow: "inset 3px 0 0 var(--warn-text, #d29922)",
-                background: "var(--warn-bg, rgba(210,153,34,0.08))",
+                boxShadow: `inset 3px 0 0 ${SEV[severity].c}`,
+                background: SEV[severity].bg,
               }
             : lineRowFor(ln.kind)
         }
@@ -79,6 +87,24 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {severityLabel && LabelIcon && (
+          <span
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              padding: "0 8px",
+              color: SEV[severityLabel].c,
+            }}
+          >
+            <LabelIcon size={11} />
+            {t(`diffViewer.sev.${severityLabel}`)}
+          </span>
+        )}
       </div>
 
       {commenting &&

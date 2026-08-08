@@ -56,6 +56,16 @@
       "core": "The substance of the change — review closely",
       "wiring": "Hooks the core into the app",
       "boilerplate": "Generated / mechanical — skim"
-    }
+    },
+    "sev": {
+      "CRITICAL": "blocker",
+      "WARNING": "warning",
+      "SUGGESTION": "suggestion"
+    },
+    "filterPlaceholder": "Filter files…",
+    "filterTitle": "Filter files",
+    "onlyFindings": "With findings",
+    "noFilesMatch": "No files match.",
+    "cleanNoFindings": "No findings yet — run a review."
   }
 }

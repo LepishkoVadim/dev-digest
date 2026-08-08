@@ -4,7 +4,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, SEV } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
@@ -18,6 +18,7 @@ import {
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
+import { severityByLine, labelByLine, topSeverity, type DiffFinding } from "../severity";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
@@ -38,18 +39,27 @@ export function findingAnchorId(path: string, line: number): string {
 export function FileCard({
   file,
   commenting,
-  findingLines,
+  findings,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
-  /** New-side line numbers covered by review findings (Smart Diff). */
-  findingLines?: number[];
+  /** Review findings on this file (Smart Diff) — carry severity + span. */
+  findings?: DiffFinding[];
 }) {
   const t = useTranslations("shell");
-  const findingSet = React.useMemo(() => new Set(findingLines ?? []), [findingLines]);
+  const fileFindings = React.useMemo(() => findings ?? [], [findings]);
+  const sevByLine = React.useMemo(() => severityByLine(fileFindings), [fileFindings]);
+  const lblByLine = React.useMemo(() => labelByLine(fileFindings), [fileFindings]);
+  const topSev = React.useMemo(() => topSeverity(fileFindings), [fileFindings]);
+  const findingCount = fileFindings.length;
+  // First finding line (lowest new-side line), for the badge's scroll target.
+  const firstFindingLine = React.useMemo(
+    () => (fileFindings.length ? Math.min(...fileFindings.map((f) => Math.min(f.startLine, f.endLine))) : null),
+    [fileFindings],
+  );
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES ||
-      findingSet.size > 0 // files with findings always start expanded
+      findingCount > 0 // files with findings always start expanded
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
@@ -57,11 +67,10 @@ export function FileCard({
   function jumpToFirstFinding(e: React.MouseEvent) {
     e.stopPropagation();
     setOpen(true);
-    const first = findingLines?.[0];
-    if (first == null) return;
+    if (firstFindingLine == null) return;
     requestAnimationFrame(() => {
       document
-        .getElementById(findingAnchorId(file.path, first))
+        .getElementById(findingAnchorId(file.path, firstFindingLine))
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }
@@ -93,7 +102,7 @@ export function FileCard({
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
-        {findingSet.size > 0 && (
+        {findingCount > 0 && topSev && (
           <button
             type="button"
             onClick={jumpToFirstFinding}
@@ -106,13 +115,13 @@ export function FileCard({
               padding: "1px 7px",
               borderRadius: 999,
               cursor: "pointer",
-              border: "1px solid var(--warn-text, #d29922)",
-              color: "var(--warn-text, #d29922)",
-              background: "var(--warn-bg, rgba(210,153,34,0.08))",
+              border: `1px solid ${SEV[topSev].c}`,
+              color: SEV[topSev].c,
+              background: SEV[topSev].bg,
             }}
           >
             <Icon.AlertTriangle size={12} />
-            {t("diffViewer.findings", { count: findingSet.size })}
+            {t("diffViewer.findings", { count: findingCount })}
           </button>
         )}
         {commentCount > 0 && (
@@ -130,7 +139,8 @@ export function FileCard({
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
             lines.map((ln, i) => {
-              const isFinding = ln.newNo != null && findingSet.has(ln.newNo);
+              const severity = ln.newNo != null ? sevByLine.get(ln.newNo) : undefined;
+              const severityLabel = ln.newNo != null ? lblByLine.get(ln.newNo) : undefined;
               return (
                 <CodeLine
                   key={i}
@@ -138,8 +148,9 @@ export function FileCard({
                   path={file.path}
                   threads={threadsForLine(ln, matched)}
                   commenting={commenting}
-                  isFinding={isFinding}
-                  anchorId={isFinding ? findingAnchorId(file.path, ln.newNo!) : undefined}
+                  severity={severity}
+                  severityLabel={severityLabel}
+                  anchorId={severity ? findingAnchorId(file.path, ln.newNo!) : undefined}
                 />
               );
             })
