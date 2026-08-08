@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import type { PrMeta, PrDetail, GitHubClient, PrReviewComment, SmartDiff } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -9,6 +9,7 @@ import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
 import { runCostUsd } from '../reviews/repository/run.repo.js';
+import { buildSmartDiff } from './smart-diff.js';
 
 export type SeverityCounts = { CRITICAL: number; WARNING: number; SUGGESTION: number };
 
@@ -313,6 +314,36 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         })),
       };
     }
+  });
+
+  // ---- Smart Diff — risk-ordered files (no LLM) ---------------------------
+  // Deterministic: classify the PR's persisted files by path, attach the lines
+  // covered by the latest review's findings. Findings are aggregated across the
+  // PR's `review`-kind reviews (one "Run Review" can fan out to many agents, so
+  // scoping to a single row would drop most badges); empty before any review.
+  app.get('/pulls/:id/smart-diff', { schema: { params: IdParams } }, async (req): Promise<SmartDiff> => {
+    const { workspaceId } = await getContext(container, req);
+    const [pr] = await container.db
+      .select()
+      .from(t.pullRequests)
+      .where(
+        and(eq(t.pullRequests.workspaceId, workspaceId), eq(t.pullRequests.id, req.params.id)),
+      );
+    if (!pr) throw new NotFoundError('Pull request not found');
+
+    const files = await container.db.select().from(t.prFiles).where(eq(t.prFiles.prId, pr.id));
+    // Findings via the same inline review-kind join the PR list uses (avoids a
+    // cross-module import); empty until a review has run.
+    const findings = await container.db
+      .select({ file: t.findings.file, start_line: t.findings.startLine, end_line: t.findings.endLine })
+      .from(t.findings)
+      .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+      .where(and(eq(t.reviews.prId, pr.id), eq(t.reviews.kind, 'review')));
+
+    return buildSmartDiff(
+      files.map((f) => ({ path: f.path, additions: f.additions, deletions: f.deletions })),
+      findings,
+    );
   });
 
   // ---- Inline review comments (Files changed tab) -------------------------

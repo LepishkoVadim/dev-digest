@@ -14,11 +14,17 @@ export function CodeLine({
   path,
   threads,
   commenting,
+  isFinding,
+  anchorId,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** True when a review finding covers this line — tints it and adds an accent bar. */
+  isFinding?: boolean;
+  /** DOM id set on the row so a findings badge can scroll to it. */
+  anchorId?: string;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -37,11 +43,22 @@ export function CodeLine({
 
   return (
     <div
+      id={anchorId}
       style={cs.rowWrap}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div
+        style={
+          isFinding
+            ? {
+                ...lineRowFor(ln.kind),
+                boxShadow: "inset 3px 0 0 var(--warn-text, #d29922)",
+                background: "var(--warn-bg, rgba(210,153,34,0.08))",
+              }
+            : lineRowFor(ln.kind)
+        }
+      >
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button

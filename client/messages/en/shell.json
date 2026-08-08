@@ -40,6 +40,22 @@
     "reply": "Reply",
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
-    "outdatedTitle": "{count} comment(s) on older revisions"
+    "outdatedTitle": "{count} comment(s) on older revisions",
+    "smartOrder": "Smart order",
+    "originalOrder": "Original order",
+    "filesCount": "{count} files",
+    "findings": "{count} findings",
+    "jumpToFinding": "Jump to the first finding in this file",
+    "splitSuggestion": "Large PR · {lines} lines changed — consider splitting into {parts} parts",
+    "role": {
+      "core": "Core logic",
+      "wiring": "Wiring",
+      "boilerplate": "Boilerplate"
+    },
+    "roleHint": {
+      "core": "The substance of the change — review closely",
+      "wiring": "Hooks the core into the app",
+      "boilerplate": "Generated / mechanical — skim"
+    }
   }
 }
