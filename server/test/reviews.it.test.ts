@@ -119,6 +119,16 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
         git: new MockGitClient({ diff: DIFF }),
         llm: {
           [provider]: new MockLLMProvider(provider, { structured }),
+          // A review run derives PR intent as pre-work via the `review_intent`
+          // feature model, whose registry default provider is `openrouter`.
+          // This MUST be stubbed: an unstubbed container.llm('openrouter')
+          // falls back to the real key in ~/.devdigest/secrets.json and makes a
+          // LIVE API call, making the suite slow, costly and non-hermetic.
+          openrouter: new MockLLMProvider('openai', {
+            structuredBySchema: {
+              Intent: { intent: 'stub intent', in_scope: [], out_of_scope: [] },
+            },
+          }) as unknown as LLMProvider,
         },
       },
     });
@@ -352,6 +362,189 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     // seed has 2 enabled agents; we may have created more above in this PR's ws.
     expect(body.runs.length).toBeGreaterThanOrEqual(2);
+    await app.close();
+  });
+});
+
+/**
+ * PR intent — the cheap metadata-only classifier persisted per PR.
+ *
+ * The classifier resolves the `review_intent` feature model, whose registry
+ * default is `openrouter`/`deepseek-v4-flash`, so the mock is registered under
+ * `openrouter` and keyed by schemaName ('Intent') to keep it distinct from the
+ * main 'Review' call.
+ */
+d('PR intent (Testcontainers pg)', () => {
+  let pg: PgFixture;
+  let workspaceId: string;
+
+  beforeAll(async () => {
+    pg = await startPg();
+    await seed(pg.handle.db);
+    const [ws] = await pg.handle.db.select().from(t.workspaces);
+    workspaceId = ws!.id;
+  });
+  afterAll(async () => {
+    await pg?.stop();
+  });
+
+  const INTENT_FIXTURE = {
+    intent: 'Adds rate limiting to the public API endpoints.',
+    in_scope: ['rate limiting', 'public API'],
+    out_of_scope: ['billing'],
+  };
+
+  function appWithIntent(intent: unknown = INTENT_FIXTURE) {
+    return buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          // The classifier's provider (registry default for review_intent).
+          openrouter: new MockLLMProvider('openai', {
+            structuredBySchema: { Intent: intent },
+          }) as unknown as LLMProvider,
+        },
+      },
+    });
+  }
+
+  it('GET returns 404 before the intent has ever been derived', async () => {
+    const app = await appWithIntent();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const res = await app.inject({ method: 'GET', url: `/pulls/${pr.id}/intent` });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('POST persists confidence/sources/model/derived_at; GET returns it', async () => {
+    const app = await appWithIntent();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+
+    const post = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/intent` });
+    expect(post.statusCode).toBe(200);
+    const body = post.json();
+    expect(body.pr_id).toBe(pr.id);
+    expect(body.intent).toBe(INTENT_FIXTURE.intent);
+    expect(body.in_scope).toEqual(INTENT_FIXTURE.in_scope);
+    expect(body.out_of_scope).toEqual(INTENT_FIXTURE.out_of_scope);
+    // Derived in CODE, not reported by the model. The seeded PR body links
+    // "Closes #471" but MockGitHub isn't wired, so the issue is unavailable →
+    // confidence must be forced down to 'low' and never 'high'.
+    expect(['high', 'medium', 'low']).toContain(body.confidence);
+    expect(body.confidence).not.toBe('high');
+    expect(body.model).toBe('openrouter/deepseek/deepseek-v4-flash');
+    expect(body.derived_at).toBeTruthy();
+    // The source inventory is present and carries only short labels.
+    expect(Array.isArray(body.sources)).toBe(true);
+    expect(body.sources.length).toBeGreaterThan(0);
+    for (const src of body.sources) {
+      expect(['used', 'empty', 'unavailable']).toContain(src.status);
+      expect(src.ref.length).toBeLessThan(200);
+    }
+
+    const get = await app.inject({ method: 'GET', url: `/pulls/${pr.id}/intent` });
+    expect(get.statusCode).toBe(200);
+    expect(get.json().intent).toBe(INTENT_FIXTURE.intent);
+
+    await app.close();
+  });
+
+  it('a second POST OVERWRITES rather than duplicating (PK is pr_id)', async () => {
+    const app = await appWithIntent();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/intent` });
+    const first = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/intent` })).json();
+
+    const app2 = await appWithIntent({
+      intent: 'REVISED: only touches the rate limiter.',
+      in_scope: ['rate limiting'],
+      out_of_scope: [],
+    });
+    const second = (
+      await app2.inject({ method: 'POST', url: `/pulls/${pr.id}/intent` })
+    ).json();
+
+    expect(second.intent).toBe('REVISED: only touches the rate limiter.');
+    expect(second.out_of_scope).toEqual([]);
+    expect(second.derived_at).not.toBe(first.derived_at);
+
+    // Exactly ONE row for this PR — the upsert overwrote it.
+    const rows = await pg.handle.db.select().from(t.prIntent).where(eq(t.prIntent.prId, pr.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.intent).toBe('REVISED: only touches the rate limiter.');
+
+    await app.close();
+    await app2.close();
+  });
+
+  it('a review run reuses the persisted intent and still completes', async () => {
+    const app = await appWithIntent();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/intent` });
+
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'IntentAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/pulls/${pr.id}/review`,
+      payload: { agentId: agent.id },
+    });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(1);
+    // The prompt slot made it into the persisted trace.
+    const runId = reviews[0].run_id;
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    expect(trace.prompt_assembly.intent).toContain('Adds rate limiting');
+    expect(trace.prompt_assembly.user).toContain('## Derived intent & scope');
+
+    await app.close();
+  });
+
+  it('a failing classifier NEVER fails the review run', async () => {
+    // No `openrouter` provider registered at all → container.llm throws
+    // ConfigError inside deriveIntent. The run must still complete.
+    // Force the classifier to THROW: MockLLMProvider rejects a fixture that
+    // does not satisfy the requested schema, so an intentionally-invalid
+    // 'Intent' fixture makes completeStructured throw inside deriveIntent.
+    //
+    // NB: injecting NO openrouter provider does NOT work as a failure case —
+    // the container falls back to the REAL key in ~/.devdigest/secrets.json and
+    // makes a live API call. Always inject the provider explicitly.
+    const app = await appWithIntent({ not_an_intent: true });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'NoIntentAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/pulls/${pr.id}/review`,
+      payload: { agentId: agent.id },
+    });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0].findings).toHaveLength(1);
+    // No intent was derived, so the slot is absent — not a failure.
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${reviews[0].run_id}/trace` })).json();
+    expect(trace.prompt_assembly.intent ?? null).toBeNull();
+
     await app.close();
   });
 });

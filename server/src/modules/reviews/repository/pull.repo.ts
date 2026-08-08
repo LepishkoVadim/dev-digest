@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { Intent } from '@devdigest/shared';
+import { IntentConfidence, type Intent } from '@devdigest/shared';
 import type { PullRow } from '../../../db/rows.js';
 
 // ---- PR lookup (workspace-scoped) -----------------------------------------
@@ -46,23 +46,39 @@ export async function markReviewed(db: Db, prId: string, sha: string): Promise<v
 
 // ---- intent ---------------------------------------------------------------
 
+/**
+ * The persisted intent DTO: the shared `Intent` plus the storage-only
+ * `derived_at` stamp. PK is `pr_id`, so a re-derive OVERWRITES rather than
+ * appending — intent is per-PR, not per-SHA.
+ */
+export type StoredIntent = Intent & { derived_at: string | null };
+
 export async function upsertIntent(db: Db, prId: string, intent: Intent): Promise<void> {
+  const values = {
+    intent: intent.intent,
+    inScope: intent.in_scope,
+    outOfScope: intent.out_of_scope,
+    confidence: intent.confidence ?? null,
+    sources: intent.sources ?? [],
+    model: intent.model ?? null,
+    derivedAt: new Date(),
+  };
   await db
     .insert(t.prIntent)
-    .values({
-      prId,
-      intent: intent.intent,
-      inScope: intent.in_scope,
-      outOfScope: intent.out_of_scope,
-    })
-    .onConflictDoUpdate({
-      target: t.prIntent.prId,
-      set: { intent: intent.intent, inScope: intent.in_scope, outOfScope: intent.out_of_scope },
-    });
+    .values({ prId, ...values })
+    .onConflictDoUpdate({ target: t.prIntent.prId, set: values });
 }
 
-export async function getIntent(db: Db, prId: string): Promise<Intent | undefined> {
+export async function getIntent(db: Db, prId: string): Promise<StoredIntent | undefined> {
   const [row] = await db.select().from(t.prIntent).where(eq(t.prIntent.prId, prId));
   if (!row) return undefined;
-  return { intent: row.intent, in_scope: row.inScope, out_of_scope: row.outOfScope };
+  return {
+    intent: row.intent,
+    in_scope: row.inScope,
+    out_of_scope: row.outOfScope,
+    confidence: IntentConfidence.safeParse(row.confidence).data ?? null,
+    sources: row.sources,
+    model: row.model,
+    derived_at: row.derivedAt?.toISOString() ?? null,
+  };
 }

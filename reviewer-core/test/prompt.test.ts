@@ -64,3 +64,44 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — ## Derived intent & scope', () => {
+  const INTENT = 'Intent: Adds rate limiting.\nIn scope: public API\nConfidence: high';
+
+  it('omits the section when intent is undefined or blank (no behaviour change)', () => {
+    expect(userOf({ system: 'sys', diff: 'DIFF' })).not.toContain('## Derived intent');
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.intent ?? null).toBeNull();
+    expect(userOf({ system: 'sys', diff: 'DIFF', intent: '  ' })).not.toContain(
+      '## Derived intent',
+    );
+  });
+
+  it('renders it untrusted-wrapped, after the PR description and before the diff', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      prDescription: 'DESC',
+      intent: INTENT,
+      skills: ['SKILL-BODY'],
+    });
+    const user = messages[1]!.content;
+    expect(user).toContain('## Derived intent & scope');
+    expect(user).toContain('<untrusted source="intent">');
+    expect(user).toContain('Adds rate limiting.');
+    expect(user.indexOf('## PR description')).toBeLessThan(user.indexOf('## Derived intent'));
+    expect(user.indexOf('## Derived intent')).toBeLessThan(user.indexOf('## Skills / rules'));
+    expect(user.indexOf('## Derived intent')).toBeLessThan(user.indexOf('## Diff to review'));
+    expect(assembly.intent).toBe(INTENT);
+  });
+
+  it('keeps the "serious out-of-scope defect must still be reported" rule OUTSIDE the wrap', () => {
+    // The scope hint is a TRUSTED instruction: if it sat inside <untrusted>, the
+    // guard would tell the model to ignore it. Assert it is after the closing tag.
+    const user = userOf({ system: 'sys', diff: 'DIFF', intent: INTENT });
+    const closeIdx = user.indexOf('</untrusted>');
+    const ruleIdx = user.indexOf('MUST still be reported');
+    expect(ruleIdx).toBeGreaterThan(closeIdx);
+    expect(user).toMatch(/SERIOUS problem .* outside the stated scope MUST still be reported/s);
+    expect(user).toMatch(/ONE consolidated finding/);
+  });
+});

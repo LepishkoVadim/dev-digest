@@ -14,6 +14,8 @@ import { ReviewService } from './service.js';
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
+ *   GET    /pulls/:id/intent                           → the persisted PR intent (404 when never derived)
+ *   POST   /pulls/:id/intent                           → (re-)derive the PR intent (cheap classifier)
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
@@ -135,6 +137,27 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     const { workspaceId } = await getContext(container, req);
     return service.reviewsForPull(workspaceId, req.params.id);
   });
+
+  // ---- PR intent (derived once, reused by every run) ----------------------
+  app.get('/pulls/:id/intent', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    const intent = await service.getIntent(workspaceId, req.params.id);
+    if (!intent) throw new NotFoundError('Intent not derived for this pull request');
+    return { pr_id: req.params.id, ...intent };
+  });
+
+  // Tight per-route limit: this triggers an LLM call (same tier as
+  // /pulls/:id/review and conventions/extract). Allowed while a run is in
+  // flight — the run's trace records the assembly it actually used.
+  app.post(
+    '/pulls/:id/intent',
+    { schema: { params: IdParams }, config: { rateLimit: { max: 6, timeWindow: '1 minute' } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      const intent = await service.deriveIntent(workspaceId, req.params.id);
+      return { pr_id: req.params.id, ...intent };
+    },
+  );
 
   // ---- Delete a whole review run (one agent's pass) + its findings --------
   app.delete('/reviews/:id', { schema: { params: IdParams } }, async (req) => {
