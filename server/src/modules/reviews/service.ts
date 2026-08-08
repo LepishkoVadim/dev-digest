@@ -1,12 +1,31 @@
 import type { Container } from '../../platform/container.js';
-import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
+import type {
+  FindingActionKind,
+  Intent,
+  IntentSource,
+  RunEventKind,
+  RunTrace,
+  UnifiedDiff,
+} from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
-import { ReviewRepository } from './repository.js';
+import type { RunLogger } from '../../platform/run-logger.js';
+import { resolveFeatureModel } from '../settings/feature-models.js';
+import { readFileSafe } from '../conventions/helpers.js';
+import { ReviewRepository, type StoredIntent } from './repository.js';
 import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto } from './helpers.js';
+import { loadDiff } from './diff-loader.js';
+import {
+  LINKED_ISSUE_PATTERN,
+  IntentResult,
+  buildIntentMessages,
+  deriveConfidence,
+  extractDocRefs,
+  hunkHeaderDigest,
+} from './intent.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -33,7 +52,9 @@ export class ReviewService {
   constructor(private container: Container) {
     this.repo = new ReviewRepository(container.db);
     this.agents = container.agentsRepo;
-    this.executor = new ReviewRunExecutor(container, this.repo, this.agents);
+    this.executor = new ReviewRunExecutor(container, this.repo, this.agents, (ws, prId, opts) =>
+      this.deriveIntent(ws, prId, opts),
+    );
   }
 
   // ===========================================================================
@@ -139,6 +160,161 @@ export class ReviewService {
 
   private publish(runId: string, kind: RunEventKind, msg: string, data?: unknown) {
     return this.container.runBus.publish(runId, kind, msg, data);
+  }
+
+  // ===========================================================================
+  // PR intent — the cheap metadata-only classifier
+  // ===========================================================================
+
+  /** The persisted intent for a PR, or undefined when it has never been derived. */
+  async getIntent(workspaceId: string, prId: string): Promise<StoredIntent | undefined> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    return this.repo.getIntent(prId);
+  }
+
+  /**
+   * Derive (or re-derive) a PR's intent + scope with the cheap `review_intent`
+   * model and persist it. Same shape as `ConventionsService.extract`:
+   * gather sources (pure code) → resolveFeatureModel → container.llm →
+   * completeStructured → **code-side gate** → persist.
+   *
+   * The classifier is METADATA-ONLY: title, body, linked issue, plan docs, and
+   * the changed-file/hunk-position digest. It never receives a diff body.
+   * `confidence` is computed by `deriveConfidence` from which sources actually
+   * resolved — the model never reports it.
+   */
+  async deriveIntent(
+    workspaceId: string,
+    prId: string,
+    opts: { diff?: UnifiedDiff; log?: RunLogger } = {},
+  ): Promise<StoredIntent> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repo = await this.repo.getRepo(pull.repoId);
+    if (!repo) throw new NotFoundError('Repo not found');
+    const log = opts.log;
+
+    // ---- 1. Gather sources (pure code). Every fetch is individually caught
+    //         into status:'unavailable' — a failure MARKS the source, never
+    //         silently drops it.
+    const sources: IntentSource[] = [{ kind: 'pr_title', ref: `#${pull.number}`, status: 'used' }];
+    const body = pull.body ?? '';
+    const hasBody = body.trim().length > 0;
+    sources.push({ kind: 'pr_body', ref: `#${pull.number}`, status: hasBody ? 'used' : 'empty' });
+
+    const ref = { owner: repo.owner, name: repo.name };
+
+    // Linked issue — reuse the SAME regex the octokit adapter already uses.
+    let linkedIssue: { ref: string; text: string } | undefined;
+    const issueMatch = body.match(LINKED_ISSUE_PATTERN);
+    if (issueMatch?.[1]) {
+      const issueRef = `#${issueMatch[1]}`;
+      try {
+        const gh = await this.container.github();
+        const issue = await gh.getIssue(ref, Number(issueMatch[1]));
+        linkedIssue = { ref: issueRef, text: `${issue.title}\n\n${issue.body ?? ''}` };
+        sources.push({ kind: 'linked_issue', ref: issueRef, status: 'used' });
+      } catch {
+        // Fetch failed → mark it missing. The prompt lists it under
+        // "## Missing context" and confidence is forced to `low`.
+        sources.push({ kind: 'linked_issue', ref: issueRef, status: 'unavailable' });
+      }
+    }
+
+    // Plan/spec docs — repo-relative paths read through git (no HTTP fetcher,
+    // so no SSRF surface); external links are recorded unavailable, never fetched.
+    const planDocs: { ref: string; text: string }[] = [];
+    for (const cand of extractDocRefs(body)) {
+      if (cand.status === 'unavailable') {
+        sources.push(cand);
+        continue;
+      }
+      const content = await readFileSafe(this.container.git, ref, cand.ref);
+      if (content == null) {
+        sources.push({ ...cand, status: 'unavailable' });
+      } else {
+        planDocs.push({ ref: cand.ref, text: content });
+        sources.push(cand);
+      }
+    }
+
+    // Changed files + hunk POSITIONS. Reuse the caller's already-loaded diff
+    // when given one (the review pre-work path) so we don't re-load it.
+    let fileDigest = '';
+    try {
+      const diff =
+        opts.diff ?? (await loadDiff(this.container, this.repo, workspaceId, pull, repo));
+      fileDigest = hunkHeaderDigest(diff);
+      const fileCount = diff.files.length;
+      sources.push({
+        kind: 'file_list',
+        ref: `${fileCount} file(s)`,
+        status: fileCount > 0 ? 'used' : 'empty',
+      });
+      const hunkCount = diff.files.reduce((n, f) => n + f.hunks.length, 0);
+      sources.push({
+        kind: 'hunk_headers',
+        ref: `${hunkCount} hunk(s)`,
+        status: hunkCount > 0 ? 'used' : 'empty',
+      });
+    } catch {
+      sources.push({ kind: 'file_list', ref: 'diff', status: 'unavailable' });
+    }
+
+    log?.info(
+      `intent: sources — ${sources.map((s) => `${s.kind}=${s.status}`).join(', ')}`,
+      sources,
+    );
+
+    // ---- 2. Cheap model → intent + scope (three fields; NO confidence).
+    const { provider, model } = await resolveFeatureModel(
+      this.container,
+      workspaceId,
+      'review_intent',
+    );
+    const llm = await this.container.llm(provider);
+    const messages = buildIntentMessages({
+      title: pull.title,
+      ...(hasBody ? { body } : {}),
+      ...(linkedIssue ? { linkedIssue } : {}),
+      ...(planDocs.length ? { planDocs } : {}),
+      ...(fileDigest ? { fileDigest } : {}),
+      sources,
+    });
+    // provider + model id only — never a key, never any prompt content.
+    log?.info(`intent: model ${provider}/${model}, ${messages.length} message(s)`);
+
+    const { data } = await llm.completeStructured({
+      model,
+      schema: IntentResult,
+      schemaName: 'Intent',
+      messages,
+      temperature: 0,
+      maxTokens: 800,
+    });
+
+    // ---- 3. Code-side gate: confidence is DERIVED, never model-reported.
+    const derived: Intent = {
+      intent: data.intent,
+      in_scope: data.in_scope,
+      out_of_scope: data.out_of_scope,
+      confidence: deriveConfidence(sources),
+      sources,
+      model: `${provider}/${model}`,
+    };
+
+    // ---- 4. Persist (PK = pr_id → a re-derive overwrites).
+    await this.repo.upsertIntent(prId, derived);
+    for (const s of sources.filter((x) => x.status === 'unavailable')) {
+      log?.info(`intent: missing context — ${s.kind}:${s.ref} unavailable`);
+    }
+    log?.result(
+      `intent derived: confidence=${derived.confidence}, ` +
+        `${derived.in_scope.length} in-scope, ${derived.out_of_scope.length} out-of-scope`,
+    );
+
+    return (await this.repo.getIntent(prId)) ?? { ...derived, derived_at: null };
   }
 
   // ===========================================================================

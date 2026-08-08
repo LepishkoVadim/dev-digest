@@ -56,8 +56,15 @@ export const ReviewRunResponse = z.object({
 });
 export type ReviewRunResponse = z.infer<typeof ReviewRunResponse>;
 
-/** Intent persisted for a PR (the Intent plus the pr_id it scopes). */
-export const PrIntentRecord = Intent.extend({ pr_id: z.string() });
+/**
+ * Intent persisted for a PR (the Intent plus the pr_id it scopes). `confidence`,
+ * `sources` and `model` are inherited from `Intent`; `derived_at` is storage-only
+ * (an ISO timestamp) so the UI can show when the classification last ran.
+ */
+export const PrIntentRecord = Intent.extend({
+  pr_id: z.string(),
+  derived_at: z.string().nullish(),
+});
 export type PrIntentRecord = z.infer<typeof PrIntentRecord>;
 
 /** Smart-diff response for a PR (the SmartDiff). */

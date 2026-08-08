@@ -52,8 +52,11 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'review_intent',
     label: 'PR Review · Intent',
     description: 'Derives a PR’s intent and scope before review.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    // Cheap metadata-only classifier (same tier as onboarding/conventions): it
+    // never sees diff bodies and `confidence` is computed in code, so a small
+    // flash-class model is enough.
+    defaultProvider: 'openrouter',
+    defaultModel: 'deepseek/deepseek-v4-flash',
   },
   {
     id: 'risk_brief',

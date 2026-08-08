@@ -6,10 +6,45 @@ import { z } from 'zod';
  */
 
 // ---- Intent ----
+/**
+ * How much of the PR's context we could actually resolve. DERIVED IN CODE from
+ * which sources came back `used` — the model never reports its own confidence
+ * (self-reported confidence tracks commitment, not correctness). An
+ * `unavailable` source can never yield `high`.
+ */
+export const IntentConfidence = z.enum(['high', 'medium', 'low']);
+export type IntentConfidence = z.infer<typeof IntentConfidence>;
+
+/**
+ * One input the intent classifier tried to read.
+ *
+ * `ref` is a SHORT HUMAN LABEL — an issue number (`#123`) or a repo-relative
+ * path (`docs/plan.md`) — never the content itself, so it is safe to log and to
+ * render. `status`: `used` = read and fed to the model, `empty` = present but
+ * blank, `unavailable` = we knew about it but could not read it (the "missing
+ * context" signal, surfaced in the UI and never silently hidden).
+ */
+export const IntentSource = z.object({
+  kind: z.enum(['pr_title', 'pr_body', 'linked_issue', 'plan_doc', 'file_list', 'hunk_headers']),
+  ref: z.string(),
+  status: z.enum(['used', 'empty', 'unavailable']),
+});
+export type IntentSource = z.infer<typeof IntentSource>;
+
+/**
+ * The three new fields are `.nullish()` so every existing producer (PrBrief,
+ * pre-migration `pr_intent` rows) keeps validating unchanged.
+ */
 export const Intent = z.object({
   intent: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
+  /** Code-derived (see IntentConfidence); null on rows written before this. */
+  confidence: IntentConfidence.nullish(),
+  /** The source inventory the confidence was derived from. */
+  sources: z.array(IntentSource).nullish(),
+  /** `provider/model` that produced the classification, for auditability. */
+  model: z.string().nullish(),
 });
 export type Intent = z.infer<typeof Intent>;
 

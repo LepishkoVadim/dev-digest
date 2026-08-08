@@ -66,6 +66,15 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * The DERIVED intent & scope for this PR — a pre-rendered string produced by
+   * the caller's cheap classifier (the engine stays pure and does no DB work).
+   * Untrusted: it is a model's summary of author-controlled text, so it is
+   * delimiter-wrapped like the PR description. Rendered right after
+   * `## PR description` so declared and derived intent read together, both ahead
+   * of the rules and the diff. Empty/undefined → section omitted.
+   */
+  intent?: string;
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -101,10 +110,25 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
       ? parts.prDescription.slice(0, MAX_PR_DESCRIPTION_CHARS)
       : undefined;
 
+  const intent =
+    parts.intent && parts.intent.trim().length > 0 ? parts.intent : undefined;
+
   const userSections: string[] = [];
   if (parts.task) userSections.push(parts.task);
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
+  }
+  if (intent) {
+    // The block itself is UNTRUSTED (a summary of author-controlled text); the
+    // instruction line below it is TRUSTED and sits OUTSIDE the wrap. It is a
+    // noise-suppression hint only — a serious defect outside the stated scope
+    // must still be reported, which INJECTION_GUARD independently enforces.
+    userSections.push(
+      `## Derived intent & scope\n${wrapUntrusted('intent', intent)}\n` +
+        'Use the scope above to prioritise: low-severity nitpicks clearly outside it may be ' +
+        'omitted as noise. A SERIOUS problem (security, data loss, correctness) outside the ' +
+        'stated scope MUST still be reported — as at most ONE consolidated finding.',
+    );
   }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
@@ -134,6 +158,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    intent: intent ?? null,
     user,
   };
 

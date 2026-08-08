@@ -4,9 +4,10 @@ import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
-import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
+import type { ReviewRepository, FindingRow, PullRow, ReviewRow, StoredIntent } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine, resolveSkillBlocks } from './helpers.js';
+import { renderIntentBlock } from './intent.js';
 import { loadDiff } from './diff-loader.js';
 import { estimateCost } from '../../adapters/llm/pricing.js';
 
@@ -46,6 +47,15 @@ export class ReviewRunExecutor {
     private container: Container,
     private repo: ReviewRepository,
     private agents: Container['agentsRepo'],
+    /**
+     * The cheap intent classifier, injected by ReviewService (which owns this
+     * executor — passing the function avoids a service↔executor import cycle).
+     */
+    private deriveIntent: (
+      workspaceId: string,
+      prId: string,
+      opts: { diff: UnifiedDiff; log: RunLogger },
+    ) => Promise<StoredIntent>,
   ) {}
 
   /**
@@ -105,6 +115,13 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // ---- Shared pre-work: PR intent (LLM call #1, the cheap classifier) -----
+    // Runs on the FANNED-OUT logger so it lands in every queued run's Live Log
+    // and persisted trace. Reuses the persisted intent when present so a re-run
+    // pays nothing. Best-effort: it MUST NEVER fail the run — same contract as
+    // buildCallersDigest.
+    const intentBlock = await this.buildIntentBlock(workspaceId, pull, diff, runLog);
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -112,7 +129,16 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(
+          workspaceId,
+          pull,
+          repo,
+          diff,
+          agent,
+          runId,
+          runLog,
+          intentBlock,
+        );
         logger?.info(
           {
             runId,
@@ -144,6 +170,9 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    /** Pre-rendered derived-intent block for the prompt slot; omitted when the
+        classifier had nothing / failed (best-effort pre-work). */
+    intentBlock?: string,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -209,6 +238,9 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Derived intent & scope (LLM call #1's output) — untrusted, wrapped by
+        // assemblePrompt. Omitted when the classifier produced nothing.
+        ...(intentBlock ? { intent: intentBlock } : {}),
         // Agent's enabled skills as prompt rules (omitted when none).
         ...(blocks.length ? { skills: blocks } : {}),
         task,
@@ -324,6 +356,42 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /**
+   * Resolve the `## Derived intent & scope` prompt block: reuse the persisted
+   * intent when present, otherwise run the cheap classifier (LLM call #1).
+   *
+   * Best-effort by contract — ANY failure (no OpenRouter key, model error, DB
+   * hiccup) is logged and swallowed, and the run proceeds with no intent slot.
+   * Deriving intent must never fail a review.
+   */
+  private async buildIntentBlock(
+    workspaceId: string,
+    pull: PullRow,
+    diff: UnifiedDiff,
+    runLog: RunLogger,
+  ): Promise<string | undefined> {
+    try {
+      const existing = await this.repo.getIntent(pull.id);
+      if (existing) {
+        runLog.info(
+          `intent: reusing persisted intent (derived ${existing.derived_at ?? 'unknown'})`,
+        );
+        return renderIntentBlock(existing);
+      }
+      const derived = await runLog.step(
+        'Deriving PR intent',
+        () => this.deriveIntent(workspaceId, pull.id, { diff, log: runLog }),
+        { kind: 'tool' },
+      );
+      return renderIntentBlock(derived);
+    } catch (err) {
+      runLog.info(
+        `intent: derivation failed — ${(err as Error).message}; continuing without intent`,
+      );
+      return undefined;
     }
   }
 

@@ -8,6 +8,7 @@ import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
   FindingActionKind,
+  PrIntentRecord,
   PrReviewComment,
   ReviewRecord,
   ReviewRunResponse,
@@ -132,6 +133,27 @@ export function useRunReview() {
     onSuccess: (_d, { prId }) => {
       qc.invalidateQueries({ queryKey: ["reviews", prId] });
     },
+  });
+}
+
+// ---- PR intent (derived by the cheap classifier before a review) ----
+/** The persisted intent for a PR. A 404 (never derived) is an EXPECTED state, so
+    `retry: false` — we render the empty state instead of retrying three times. */
+export function usePrIntent(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pr-intent", prId],
+    queryFn: () => api.get<PrIntentRecord>(`/pulls/${prId}/intent`),
+    enabled: !!prId,
+    retry: false,
+  });
+}
+
+/** (Re-)derive the intent for a PR; refreshes the query on success. */
+export function useDeriveIntent(prId: string | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<PrIntentRecord>(`/pulls/${prId}/intent`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pr-intent", prId] }),
   });
 }
 

@@ -21,6 +21,7 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
+export type { StoredIntent } from './repository/pull.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -131,7 +132,7 @@ export class ReviewRepository {
     return pullRepo.upsertIntent(this.db, prId, intent);
   }
 
-  getIntent(prId: string): Promise<Intent | undefined> {
+  getIntent(prId: string): Promise<pullRepo.StoredIntent | undefined> {
     return pullRepo.getIntent(this.db, prId);
   }
 

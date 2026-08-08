@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, index } from 'drizzle-orm/pg-core';
+import type { IntentSource } from '@devdigest/shared';
 import { now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
@@ -57,6 +58,19 @@ export const prIntent = pgTable('pr_intent', {
   intent: text('intent').notNull(),
   inScope: jsonb('in_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   outOfScope: jsonb('out_of_scope').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  /**
+   * `high|medium|low`, DERIVED IN CODE from which sources resolved (never
+   * self-reported by the model). `text` rather than a PG enum: the set is
+   * behaviour-driven and may evolve, and a nullable text column needs no
+   * backfill for rows written before this migration.
+   */
+  confidence: text('confidence'),
+  /** IntentSource[] — the source inventory `confidence` was derived from. */
+  sources: jsonb('sources').$type<IntentSource[]>().notNull().default(sql`'[]'::jsonb`),
+  /** `provider/model` that produced the classification (auditability). */
+  model: text('model'),
+  /** When the classification last ran. No volatile DEFAULT → no table rewrite. */
+  derivedAt: timestamp('derived_at', { withTimezone: true }),
 });
 
 export const prBrief = pgTable('pr_brief', {
