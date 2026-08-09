@@ -162,6 +162,8 @@ export default function PRDetailPage() {
             }}
             severityFilter={severityFilter}
             onSetSeverity={setSeverity}
+            focusFindingId={search.get("finding")}
+            onFindingFocused={() => setParam("finding", null)}
           />
         )}
 

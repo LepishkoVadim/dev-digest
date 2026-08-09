@@ -4,7 +4,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, SEV } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
@@ -18,6 +18,7 @@ import {
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
+import { severityByLine, labelByLine, topSeverity, type DiffFinding } from "../severity";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
@@ -30,12 +31,46 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+/** DOM id for a finding line, so a badge click can scroll straight to it. */
+export function findingAnchorId(path: string, line: number): string {
+  return `sd-line-${path}-${line}`;
+}
+
+export function FileCard({
+  file,
+  commenting,
+  findings,
+  onFindingClick,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  /** Review findings on this file (Smart Diff) — carry id + severity + span. */
+  findings?: DiffFinding[];
+  /** Navigate to a finding's FindingCard (Findings tab). */
+  onFindingClick?: (findingId: string) => void;
+}) {
   const t = useTranslations("shell");
+  const fileFindings = React.useMemo(() => findings ?? [], [findings]);
+  const sevByLine = React.useMemo(() => severityByLine(fileFindings), [fileFindings]);
+  const lblByLine = React.useMemo(() => labelByLine(fileFindings), [fileFindings]);
+  const topSev = React.useMemo(() => topSeverity(fileFindings), [fileFindings]);
+  const findingCount = fileFindings.length;
+  // The first finding (lowest new-side line) — the badge deep-links to it.
+  const firstFinding = React.useMemo(
+    () => [...fileFindings].sort((a, b) => Math.min(a.startLine, a.endLine) - Math.min(b.startLine, b.endLine))[0] ?? null,
+    [fileFindings],
+  );
   const [open, setOpen] = React.useState(
-    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
+    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES ||
+      findingCount > 0 // files with findings always start expanded
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+
+  // Badge click → open the finding's FindingCard on the Findings tab.
+  function openFirstFinding(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (firstFinding) onFindingClick?.(firstFinding.id);
+  }
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -64,6 +99,28 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
         </span>
+        {findingCount > 0 && topSev && (
+          <button
+            type="button"
+            onClick={openFirstFinding}
+            title={t("diffViewer.openFinding")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              padding: "1px 7px",
+              borderRadius: 999,
+              cursor: "pointer",
+              border: `1px solid ${SEV[topSev].c}`,
+              color: SEV[topSev].c,
+              background: SEV[topSev].bg,
+            }}
+          >
+            <Icon.AlertTriangle size={12} />
+            {t("diffViewer.findings", { count: findingCount })}
+          </button>
+        )}
         {commentCount > 0 && (
           <span
             style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-muted)" }}
@@ -78,15 +135,23 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (
-            lines.map((ln, i) => (
-              <CodeLine
-                key={i}
-                ln={ln}
-                path={file.path}
-                threads={threadsForLine(ln, matched)}
-                commenting={commenting}
-              />
-            ))
+            lines.map((ln, i) => {
+              const severity = ln.newNo != null ? sevByLine.get(ln.newNo) : undefined;
+              const labelFinding = ln.newNo != null ? lblByLine.get(ln.newNo) : undefined;
+              return (
+                <CodeLine
+                  key={i}
+                  ln={ln}
+                  path={file.path}
+                  threads={threadsForLine(ln, matched)}
+                  commenting={commenting}
+                  severity={severity}
+                  labelFinding={labelFinding}
+                  onFindingClick={onFindingClick}
+                  anchorId={severity ? findingAnchorId(file.path, ln.newNo!) : undefined}
+                />
+              );
+            })
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
         </div>

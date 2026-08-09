@@ -28,6 +28,10 @@ interface FindingsTabProps {
   severityFilter?: string | null;
   /** Toggle the severity filter (null clears it). */
   onSetSeverity: (severity: string | null) => void;
+  /** Finding id to reveal (from ?finding=, e.g. a Smart Diff badge click). */
+  focusFindingId?: string | null;
+  /** Called once the focused finding has been revealed, so the param can clear. */
+  onFindingFocused?: () => void;
 }
 
 const SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
@@ -48,6 +52,8 @@ export function FindingsTab({
   onRunDone,
   severityFilter,
   onSetSeverity,
+  focusFindingId,
+  onFindingFocused,
 }: FindingsTabProps) {
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
@@ -78,6 +84,39 @@ export function FindingsTab({
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Deep-link from a Smart Diff finding badge (?finding=<id>): open the run's
+  // accordion, scroll to that FindingCard, flash it, then clear the param.
+  React.useEffect(() => {
+    if (!focusFindingId) return;
+    const review = runs.find((r) => r.findings.some((f) => f.id === focusFindingId));
+    if (!review) return; // reviews not loaded yet — effect re-runs when `runs` arrives
+    // A severity filter could hide the target run — clear it so the card renders.
+    if (severityFilter && !review.findings.some((f) => f.id === focusFindingId && f.severity === severityFilter)) {
+      onSetSeverity(null);
+    }
+    if (review.run_id) setTarget((p) => ({ runId: review.run_id!, n: (p?.n ?? 0) + 1 }));
+
+    let raf = 0;
+    let tries = 0;
+    const tick = () => {
+      const el = document.querySelector<HTMLElement>(`[data-finding-id="${focusFindingId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.style.transition = "box-shadow .25s";
+        el.style.boxShadow = "0 0 0 2px var(--accent-text, #6b8afd)";
+        window.setTimeout(() => {
+          el.style.boxShadow = "";
+        }, 1600);
+        onFindingFocused?.();
+        return;
+      }
+      if (tries++ < 30) raf = requestAnimationFrame(tick); // wait for the accordion to open
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFindingId, runs]);
 
   // Aggregate per-severity counts across all this PR's reviews — the same
   // findings the accordions render, so the tally always matches what's shown.
