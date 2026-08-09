@@ -10,6 +10,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Icon, SeverityBadge } from "@devdigest/ui";
 import type { PrFile } from "@/lib/types";
 import type { SmartDiffGroup, SmartDiffRole } from "@devdigest/shared";
@@ -74,6 +75,7 @@ function RoleGroup({
   findingsByPath,
   commenting,
   scrollTop,
+  onFindingClick,
   t,
 }: {
   group: SmartDiffGroup;
@@ -84,6 +86,7 @@ function RoleGroup({
   commenting?: DiffCommentApi;
   /** scrollMarginTop so a jumped-to file clears the sticky page header. */
   scrollTop: number;
+  onFindingClick: (findingId: string) => void;
   t: ShellT;
 }) {
   const RoleIcon = ROLE_ICON[group.role];
@@ -110,7 +113,12 @@ function RoleGroup({
               byPath.get(f.path) ?? { path: f.path, additions: f.additions, deletions: f.deletions, patch: null };
             return (
               <div key={f.path} id={fileAnchorId(f.path)} style={{ scrollMarginTop: scrollTop }}>
-                <FileCard file={file} commenting={commenting} findings={findingsByPath.get(f.path) ?? []} />
+                <FileCard
+                  file={file}
+                  commenting={commenting}
+                  findings={findingsByPath.get(f.path) ?? []}
+                  onFindingClick={onFindingClick}
+                />
               </div>
             );
           })}
@@ -130,8 +138,22 @@ export function SmartDiffViewer({
   commenting?: DiffCommentApi;
 }) {
   const t = useTranslations("shell");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data, isError } = useSmartDiff(prId);
   const { data: reviews } = usePrReviews(prId);
+
+  // Deep-link a finding to its FindingCard on the Findings tab.
+  const goToFinding = React.useCallback(
+    (findingId: string) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.set("tab", "findings");
+      params.set("finding", findingId);
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams],
+  );
   const [smartOrder, setSmartOrder] = React.useState(true);
   const [openRoles, setOpenRoles] = React.useState<Set<SmartDiffRole>>(new Set(["core", "wiring"]));
   const [severityFilter, setSeverityFilter] = React.useState<Severity | null>(null);
@@ -168,7 +190,7 @@ export function SmartDiffViewer({
       if (r.kind !== "review") continue;
       for (const f of r.findings) {
         const list = m.get(f.file) ?? [];
-        list.push({ startLine: f.start_line, endLine: f.end_line, severity: f.severity as Severity });
+        list.push({ id: f.id, startLine: f.start_line, endLine: f.end_line, severity: f.severity as Severity });
         m.set(f.file, list);
       }
     }
@@ -297,6 +319,7 @@ export function SmartDiffViewer({
               findingsByPath={findingsByPath}
               commenting={commenting}
               scrollTop={navTop}
+              onFindingClick={goToFinding}
               t={t}
             />
           ))}

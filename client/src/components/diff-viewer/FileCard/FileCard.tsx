@@ -40,11 +40,14 @@ export function FileCard({
   file,
   commenting,
   findings,
+  onFindingClick,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
-  /** Review findings on this file (Smart Diff) — carry severity + span. */
+  /** Review findings on this file (Smart Diff) — carry id + severity + span. */
   findings?: DiffFinding[];
+  /** Navigate to a finding's FindingCard (Findings tab). */
+  onFindingClick?: (findingId: string) => void;
 }) {
   const t = useTranslations("shell");
   const fileFindings = React.useMemo(() => findings ?? [], [findings]);
@@ -52,9 +55,9 @@ export function FileCard({
   const lblByLine = React.useMemo(() => labelByLine(fileFindings), [fileFindings]);
   const topSev = React.useMemo(() => topSeverity(fileFindings), [fileFindings]);
   const findingCount = fileFindings.length;
-  // First finding line (lowest new-side line), for the badge's scroll target.
-  const firstFindingLine = React.useMemo(
-    () => (fileFindings.length ? Math.min(...fileFindings.map((f) => Math.min(f.startLine, f.endLine))) : null),
+  // The first finding (lowest new-side line) — the badge deep-links to it.
+  const firstFinding = React.useMemo(
+    () => [...fileFindings].sort((a, b) => Math.min(a.startLine, a.endLine) - Math.min(b.startLine, b.endLine))[0] ?? null,
     [fileFindings],
   );
   const [open, setOpen] = React.useState(
@@ -63,16 +66,10 @@ export function FileCard({
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
-  // Badge click: make sure the file is open, then scroll to its first finding.
-  function jumpToFirstFinding(e: React.MouseEvent) {
+  // Badge click → open the finding's FindingCard on the Findings tab.
+  function openFirstFinding(e: React.MouseEvent) {
     e.stopPropagation();
-    setOpen(true);
-    if (firstFindingLine == null) return;
-    requestAnimationFrame(() => {
-      document
-        .getElementById(findingAnchorId(file.path, firstFindingLine))
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    if (firstFinding) onFindingClick?.(firstFinding.id);
   }
 
   // Group this file's comments into threads, then split into ones we can anchor
@@ -105,8 +102,8 @@ export function FileCard({
         {findingCount > 0 && topSev && (
           <button
             type="button"
-            onClick={jumpToFirstFinding}
-            title={t("diffViewer.jumpToFinding")}
+            onClick={openFirstFinding}
+            title={t("diffViewer.openFinding")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -140,7 +137,7 @@ export function FileCard({
           ) : (
             lines.map((ln, i) => {
               const severity = ln.newNo != null ? sevByLine.get(ln.newNo) : undefined;
-              const severityLabel = ln.newNo != null ? lblByLine.get(ln.newNo) : undefined;
+              const labelFinding = ln.newNo != null ? lblByLine.get(ln.newNo) : undefined;
               return (
                 <CodeLine
                   key={i}
@@ -149,7 +146,8 @@ export function FileCard({
                   threads={threadsForLine(ln, matched)}
                   commenting={commenting}
                   severity={severity}
-                  severityLabel={severityLabel}
+                  labelFinding={labelFinding}
+                  onFindingClick={onFindingClick}
                   anchorId={severity ? findingAnchorId(file.path, ln.newNo!) : undefined}
                 />
               );

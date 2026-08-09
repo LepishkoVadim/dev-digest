@@ -8,7 +8,7 @@ import { Icon, SEV } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
-import type { Severity } from "../severity";
+import type { DiffFinding, Severity } from "../severity";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
@@ -18,7 +18,8 @@ export function CodeLine({
   threads,
   commenting,
   severity,
-  severityLabel,
+  labelFinding,
+  onFindingClick,
   anchorId,
 }: {
   ln: Line;
@@ -27,8 +28,11 @@ export function CodeLine({
   commenting?: DiffCommentApi;
   /** Severity of the finding covering this line — tints the row + accent bar. */
   severity?: Severity;
-  /** When set, shows a right-aligned severity label (one per finding, on its start line). */
-  severityLabel?: Severity;
+  /** When set, shows a right-aligned severity label (one per finding, on its start line)
+      that deep-links to the finding's FindingCard. */
+  labelFinding?: DiffFinding;
+  /** Navigate to a finding's FindingCard (Findings tab). */
+  onFindingClick?: (findingId: string) => void;
   /** DOM id set on the row so a findings badge can scroll to it. */
   anchorId?: string;
 }) {
@@ -47,7 +51,7 @@ export function CodeLine({
   const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "−" : "";
   const target = commenting?.canComment ? commentTargetFor(ln) : null;
   const showAdd = hover && !!target && !composing;
-  const LabelIcon = severityLabel ? Icon[SEV[severityLabel].icon] : null;
+  const LabelIcon = labelFinding ? Icon[SEV[labelFinding.severity].icon] : null;
 
   return (
     <div
@@ -87,8 +91,14 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
-        {severityLabel && LabelIcon && (
-          <span
+        {labelFinding && LabelIcon && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFindingClick?.(labelFinding.id);
+            }}
+            title={t("diffViewer.openFinding")}
             style={{
               marginLeft: "auto",
               alignSelf: "center",
@@ -98,12 +108,15 @@ export function CodeLine({
               gap: 4,
               fontSize: 11,
               padding: "0 8px",
-              color: SEV[severityLabel].c,
+              border: "none",
+              background: "none",
+              cursor: onFindingClick ? "pointer" : "default",
+              color: SEV[labelFinding.severity].c,
             }}
           >
             <LabelIcon size={11} />
-            {t(`diffViewer.sev.${severityLabel}`)}
-          </span>
+            {t(`diffViewer.sev.${labelFinding.severity}`)}
+          </button>
         )}
       </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { SmartDiff, PrFile } from "@devdigest/shared";
 import messages from "../../../../messages/en/shell.json";
@@ -10,11 +10,20 @@ const usePrReviews = vi.fn<() => { data: unknown[] }>(() => ({ data: [] }));
 vi.mock("@/lib/hooks/smart-diff", () => ({ useSmartDiff: () => useSmartDiff() }));
 vi.mock("@/lib/hooks/reviews", () => ({ usePrReviews: () => usePrReviews() }));
 
+// SmartDiffViewer deep-links findings via the App Router — stub it in jsdom.
+const routerReplace = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: routerReplace, push: routerReplace }),
+  usePathname: () => "/repos/r1/pulls/1",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { SmartDiffViewer } from "./SmartDiffViewer";
 
 afterEach(() => {
   cleanup();
   usePrReviews.mockReturnValue({ data: [] });
+  routerReplace.mockClear();
 });
 
 // core file patch has two added lines so findings on lines 1 and 2 render.
@@ -47,8 +56,8 @@ const REVIEWS = [
   {
     kind: "review",
     findings: [
-      { file: "src/middleware/ratelimit.ts", start_line: 1, end_line: 1, severity: "CRITICAL" },
-      { file: "src/middleware/ratelimit.ts", start_line: 2, end_line: 2, severity: "SUGGESTION" },
+      { id: "f-crit", file: "src/middleware/ratelimit.ts", start_line: 1, end_line: 1, severity: "CRITICAL" },
+      { id: "f-sugg", file: "src/middleware/ratelimit.ts", start_line: 2, end_line: 2, severity: "SUGGESTION" },
     ],
   },
 ];
@@ -94,6 +103,17 @@ describe("SmartDiffViewer", () => {
     // File nav lists files by basename + a filter box.
     expect(screen.getByText("ratelimit.ts")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Filter files…")).toBeInTheDocument();
+  });
+
+  it("clicking a finding label deep-links to its FindingCard (?tab=findings&finding=<id>)", () => {
+    useSmartDiff.mockReturnValue({ data: SMART_DIFF, isError: false });
+    usePrReviews.mockReturnValue({ data: REVIEWS });
+    renderViewer();
+    fireEvent.click(screen.getByText("blocker"));
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    const url = routerReplace.mock.calls[0]![0] as string;
+    expect(url).toContain("tab=findings");
+    expect(url).toContain("finding=f-crit");
   });
 
   it("keeps the boilerplate group collapsed (its diff hidden by default)", () => {

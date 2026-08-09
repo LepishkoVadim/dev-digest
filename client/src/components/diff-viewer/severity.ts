@@ -9,6 +9,8 @@ import type { Severity } from "@devdigest/shared";
 export type { Severity };
 
 export interface DiffFinding {
+  /** Persisted finding id — used to deep-link to its FindingCard. */
+  id: string;
   startLine: number;
   endLine: number;
   severity: Severity;
@@ -34,14 +36,15 @@ export function severityByLine(findings: DiffFinding[]): Map<number, Severity> {
   return m;
 }
 
-/** New-side start line → highest-severity finding starting there (the label sits
-    on each finding's first line, once per finding). */
-export function labelByLine(findings: DiffFinding[]): Map<number, Severity> {
-  const m = new Map<number, Severity>();
+/** New-side start line → the finding whose label sits there (highest severity
+    wins when several start on the same line). Carries the id so the label can
+    deep-link to its FindingCard. */
+export function labelByLine(findings: DiffFinding[]): Map<number, DiffFinding> {
+  const m = new Map<number, DiffFinding>();
   for (const f of findings) {
     const l = Math.min(f.startLine, f.endLine);
     const cur = m.get(l);
-    m.set(l, cur ? moreSevere(cur, f.severity) : f.severity);
+    m.set(l, cur ? (moreSevere(cur.severity, f.severity) === cur.severity ? cur : f) : f);
   }
   return m;
 }
