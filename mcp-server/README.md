@@ -51,15 +51,20 @@ the JSON-RPC channel).
 ## Run / verify
 
 ```bash
-# install (npm lockfile, like reviewer-core/e2e)
-cd mcp-server && npm install
+# install (pnpm; esbuild build-approval lives in pnpm-workspace.yaml)
+cd mcp-server && pnpm install
 
 # typecheck + lint + unit tests
-npm run typecheck && npm run lint && npm run test
+pnpm typecheck && pnpm lint && pnpm test
 
 # smoke via MCP Inspector (with the API running)
-npx @modelcontextprotocol/inspector npx tsx src/index.ts
+pnpm inspect
 ```
+
+> pnpm 11 escalates esbuild's "ignored build script" to a fatal pre-run check.
+> `pnpm-workspace.yaml` here approves esbuild and sets `verifyDepsBeforeRun: false`
+> — esbuild's binary ships via its `@esbuild/<platform>` optional dep, so the
+> skipped build is a no-op.
 
 In Claude Code, the root `.mcp.json` registers this server as `devdigest`;
 confirm the 5 tools appear via `/mcp`.
