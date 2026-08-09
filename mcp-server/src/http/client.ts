@@ -77,6 +77,39 @@ export interface ConventionDto {
   evidence_snippet: string;
   accepted: boolean;
 }
+/** Subset of the shared `BlastReport` contract we read for the MCP tool. */
+export interface BlastReportDto {
+  status: 'ok' | 'partial' | 'degraded' | 'empty';
+  reason: string | null;
+  changed_files: string[];
+  changed_symbols: { name: string; file: string; kind: string }[];
+  symbols: {
+    name: string;
+    file: string;
+    kind: string;
+    callers: {
+      file: string;
+      symbol: string;
+      line: number;
+      rank: number;
+      endpoints: string[];
+      crons: string[];
+    }[];
+    endpoints: string[];
+    crons: string[];
+  }[];
+  impacted_endpoints: { endpoint: string; via_files: string[]; depth: number }[];
+  prior_prs: {
+    number: number;
+    title: string;
+    status: string;
+    author: string;
+    date: string | null;
+    note: string | null;
+    files_overlap: string[];
+  }[];
+  index: { status: string; last_indexed_sha: string; indexer_version: number };
+}
 
 export class ApiClient {
   constructor(private readonly cfg: Config) {}
@@ -131,5 +164,10 @@ export class ApiClient {
 
   listConventions(repoId: string): Promise<ConventionDto[]> {
     return this.request<ConventionDto[]>(`/repos/${encodeURIComponent(repoId)}/conventions`);
+  }
+
+  /** Deterministic blast radius for a PR (same route the studio's Blast tab uses). */
+  blastForPull(prId: string): Promise<BlastReportDto> {
+    return this.request<BlastReportDto>(`/pulls/${encodeURIComponent(prId)}/blast`);
   }
 }

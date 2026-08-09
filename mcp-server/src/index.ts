@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   registerRunAgentOnPr(server, client, cfg);
   registerGetFindings(server, client);
   registerGetConventions(server, client);
-  registerGetBlastRadius(server);
+  registerGetBlastRadius(server, client);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

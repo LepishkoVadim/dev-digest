@@ -117,10 +117,11 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       })
       .returning();
 
-    // pr_files (subset)
+    // pr_files (subset). NOTE: the public route files (webhooks/index/health) are
+    // CALLERS of the changed helper, not changed themselves — so blast shows them
+    // as callers (with their endpoints) rather than as extra changed symbols.
     await db.insert(t.prFiles).values([
       { prId: pr!.id, path: 'src/middleware/ratelimit.ts', additions: 84, deletions: 0 },
-      { prId: pr!.id, path: 'src/api/public/webhooks.ts', additions: 31, deletions: 6 },
       { prId: pr!.id, path: 'src/config.ts', additions: 4, deletions: 0 },
       { prId: pr!.id, path: 'src/api/users.ts', additions: 7, deletions: 2 },
     ]);
@@ -174,6 +175,159 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         confidence: 0.86,
       },
     ]);
+  }
+
+  // ---- repo-intel index for PR #482's Blast Radius (demo) ----
+  // Without this, opening #482 shows an empty blast ("no indexed symbols"). We
+  // seed a small, self-contained index so the acceptance demo holds out of the
+  // box: the changed shared helper `ratelimit.ts` (rateLimit + bucketKey) fans
+  // out to real callers and reachable HTTP endpoints + a cron — no clone/indexer
+  // run required. Idempotent: only seeded when no index-state row exists yet.
+  const [existingIndex] = await db
+    .select()
+    .from(t.repoIndexState)
+    .where(eq(t.repoIndexState.repoId, repoId));
+  if (!existingIndex) {
+    const HELPER = 'src/middleware/ratelimit.ts'; // the changed shared helper
+    const INDEX = 'src/api/public/index.ts';
+    const WEBHOOKS = 'src/api/public/webhooks.ts';
+    const HEALTH = 'src/api/public/health.ts';
+    const SERVER = 'src/server.ts';
+    const ITEMS = 'src/api/public/items.ts';
+    const CONFIG = 'src/config.ts'; // a DEPENDENCY of the helper (direction guard)
+
+    // Symbols declared in the changed helper — the two "changed symbols" — plus
+    // the enclosing symbol at each call site, so callers show as real names
+    // (publicRouter, webhookHandler, …) in the tree and graph views.
+    await db.insert(t.symbols).values([
+      { repoId, path: HELPER, name: 'rateLimit', kind: 'function', line: 20, endLine: 60, exported: true },
+      { repoId, path: HELPER, name: 'bucketKey', kind: 'function', line: 62, endLine: 78, exported: true },
+      { repoId, path: INDEX, name: 'publicRouter', kind: 'function', line: 5, endLine: 40, exported: true },
+      { repoId, path: WEBHOOKS, name: 'webhookHandler', kind: 'function', line: 10, endLine: 60, exported: true },
+      { repoId, path: HEALTH, name: 'healthCheck', kind: 'function', line: 4, endLine: 20, exported: true },
+      { repoId, path: SERVER, name: 'app', kind: 'function', line: 20, endLine: 120, exported: true },
+      { repoId, path: ITEMS, name: 'listItems', kind: 'function', line: 8, endLine: 30, exported: true },
+    ]);
+
+    // Resolved cross-file callers (decl_file = the helper).
+    await db.insert(t.references).values([
+      { repoId, fromPath: INDEX, toSymbol: 'rateLimit', line: 23, declFile: HELPER },
+      { repoId, fromPath: WEBHOOKS, toSymbol: 'rateLimit', line: 45, declFile: HELPER },
+      { repoId, fromPath: HEALTH, toSymbol: 'rateLimit', line: 11, declFile: HELPER },
+      { repoId, fromPath: SERVER, toSymbol: 'rateLimit', line: 88, declFile: HELPER },
+      { repoId, fromPath: INDEX, toSymbol: 'bucketKey', line: 27, declFile: HELPER },
+      { repoId, fromPath: ITEMS, toSymbol: 'bucketKey', line: 14, declFile: HELPER },
+    ]);
+
+    // Import graph (importer → imported). The helper's own import of CONFIG is a
+    // dependency, so CONFIG must NOT appear as an impacted endpoint.
+    await db.insert(t.fileEdges).values([
+      { repoId, fromFile: INDEX, toFile: HELPER },
+      { repoId, fromFile: WEBHOOKS, toFile: HELPER },
+      { repoId, fromFile: HEALTH, toFile: HELPER },
+      { repoId, fromFile: SERVER, toFile: HELPER },
+      { repoId, fromFile: ITEMS, toFile: HELPER },
+      { repoId, fromFile: HELPER, toFile: CONFIG },
+    ]);
+
+    // File rank (drives caller ordering + the getResolvedCallers join).
+    const rank = (filePath: string, r: number, pct: number) => ({
+      repoId,
+      filePath,
+      pagerank: r,
+      hotness: 0,
+      rank: r,
+      percentile: pct,
+    });
+    await db.insert(t.fileRank).values([
+      rank(HELPER, 0.95, 96),
+      rank(INDEX, 0.9, 92),
+      rank(WEBHOOKS, 0.72, 74),
+      rank(HEALTH, 0.55, 60),
+      rank(SERVER, 0.4, 44),
+      rank(ITEMS, 0.35, 38),
+      rank(CONFIG, 0.3, 32),
+    ]);
+
+    // Precomputed per-file facts (endpoints/crons) for the caller files.
+    await db.insert(t.fileFacts).values([
+      { repoId, filePath: INDEX, endpoints: ['GET /api/public/items'], crons: [] },
+      { repoId, filePath: WEBHOOKS, endpoints: ['POST /api/public/webhooks'], crons: [] },
+      { repoId, filePath: HEALTH, endpoints: ['GET /api/public/health'], crons: [] },
+      { repoId, filePath: SERVER, endpoints: [], crons: ['reset-rate-buckets (hourly)'] },
+    ]);
+
+    await db.insert(t.repoIndexState).values({
+      repoId,
+      lastIndexedSha: 'a1b2c3d4e5f6',
+      indexerVersion: 2, // = constants.INDEXER_VERSION (blast reads don't gate on it)
+      status: 'full',
+      filesIndexed: 7,
+      filesSkipped: 0,
+    });
+  }
+
+  // ---- prior PRs touching the same files (Blast "Prior PRs" footer, demo) ----
+  // Merged PRs whose files overlap #482's diff, with a one-line body used as the
+  // history note. Idempotent by (repo, number).
+  const priorPrs: Array<{
+    number: number;
+    title: string;
+    author: string;
+    date: string;
+    body: string;
+    files: string[];
+  }> = [
+    {
+      number: 401,
+      title: 'Introduce public API namespace',
+      author: 'deepak.r',
+      date: '2026-03-18',
+      body: 'Original `/api/public/*` split-out. Established the router this PR hooks into.',
+      files: ['src/config.ts', 'src/api/public/index.ts'],
+    },
+    {
+      number: 356,
+      title: 'Add ioredis client for session cache',
+      author: 'marisa.koch',
+      date: '2026-02-02',
+      body: 'Redis client already lives here — reuse `src/lib/redis.ts` instead of constructing a second connection.',
+      files: ['src/config.ts', 'src/lib/redis.ts'],
+    },
+    {
+      number: 288,
+      title: 'Webhook forwarding for connect accounts',
+      author: 'tomek.w',
+      date: '2025-12-11',
+      body: 'Last change to webhooks. SSRF concern was raised in review then but deferred — relevant to finding f2.',
+      files: ['src/api/public/webhooks.ts', 'src/config.ts'],
+    },
+  ];
+  for (const p of priorPrs) {
+    const [existing] = await db
+      .select()
+      .from(t.pullRequests)
+      .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, p.number)));
+    if (existing) continue;
+    const when = new Date(`${p.date}T00:00:00Z`);
+    const [row] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: p.number,
+        title: p.title,
+        author: p.author,
+        branch: `feat/pr-${p.number}`,
+        base: 'main',
+        headSha: `sha${p.number}`,
+        status: 'merged',
+        body: p.body,
+        openedAt: when,
+        updatedAt: when,
+      })
+      .returning();
+    await db.insert(t.prFiles).values(p.files.map((path) => ({ prId: row!.id, path })));
   }
 
   // ---- built-in agents (the three starter presets) ----

@@ -86,6 +86,25 @@ export interface BlastResult {
   reason?: DegradedReason;
 }
 
+/**
+ * One HTTP endpoint reachable from a changed file through the REVERSE import
+ * graph (dependents of the change), with the distance at which it was found.
+ */
+export interface ImpactedEndpoint {
+  /** "METHOD /path". */
+  endpoint: string;
+  /** Dependent file(s) that own/register the endpoint. */
+  viaFiles: string[];
+  /** Reverse-import distance from a changed file (0 = the changed file itself). */
+  depth: number;
+}
+
+export interface ImpactedEndpointsResult {
+  endpoints: ImpactedEndpoint[];
+  degraded?: boolean;
+  reason?: DegradedReason;
+}
+
 // ---------------------------------------------------------------------------
 // Read-model rows.
 // ---------------------------------------------------------------------------
@@ -145,6 +164,15 @@ export interface RepoIntel {
 
   // --- Reads --------------------------------------------------------------
   getBlastRadius(repoId: string, changedFiles: string[]): Promise<BlastResult>;
+  /**
+   * HTTP endpoints reachable from the changed files via the REVERSE import graph
+   * (dependents), bounded to a shallow traversal (see BFS_DEPTH). Pure index
+   * read (file_edges + file_facts) — never re-parses the clone.
+   */
+  getImpactedEndpoints(
+    repoId: string,
+    changedFiles: string[],
+  ): Promise<ImpactedEndpointsResult>;
   getRepoMap(repoId: string, tokenBudget?: number): Promise<RepoMapResult>;
   getFileRank(repoId: string, paths: string[]): Promise<FileRankRow[]>;
   getSymbolsInFiles(repoId: string, paths: string[]): Promise<SymbolRow[]>;
