@@ -78,6 +78,42 @@ describe("BlastCard", () => {
     expect(screen.getByText("formatDate()")).toBeInTheDocument();
   });
 
+  it("renders same-named symbols in the graph without duplicate-key warnings", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const dup: BlastReport = {
+      ...OK,
+      changed_symbols: [
+        { name: "getPull", file: "a.ts", kind: "function" },
+        { name: "getPull", file: "b.ts", kind: "function" },
+      ],
+      symbols: [
+        {
+          name: "getPull",
+          file: "a.ts",
+          kind: "function",
+          callers: [{ file: "c1.ts", symbol: "h1", line: 1, rank: 0.5, endpoints: [], crons: [] }],
+          endpoints: [],
+          crons: [],
+        },
+        {
+          name: "getPull",
+          file: "b.ts",
+          kind: "function",
+          callers: [{ file: "c2.ts", symbol: "h2", line: 2, rank: 0.4, endpoints: [], crons: [] }],
+          endpoints: [],
+          crons: [],
+        },
+      ],
+    };
+    renderCard(dup);
+    fireEvent.click(screen.getByRole("button", { name: messages.view.graph }));
+
+    expect(screen.getAllByText("getPull()")).toHaveLength(2);
+    const dupKeyWarned = spy.mock.calls.some((c) => String(c[0]).includes("same key"));
+    expect(dupKeyWarned).toBe(false);
+    spy.mockRestore();
+  });
+
   it("expands the prior-PRs footer", () => {
     renderCard(OK);
     expect(screen.getByText(messages.priorPrs.title)).toBeInTheDocument();

@@ -32,8 +32,11 @@ function symLabel(s: { name: string; kind: string }): string {
 
 export function BlastGraph({ symbols }: { symbols: BlastReportSymbol[] }) {
   // ---- build nodes + edges ----
+  // Node ids include the file so same-named symbols/callers across files don't
+  // collide (React keys must be unique; the tree keys the same way).
+  const symId = (s: { name: string; file: string }) => `s:${s.name}@${s.file}`;
   const symNodes: GNode[] = symbols.map((s) => ({
-    id: `s:${s.name}`,
+    id: symId(s),
     label: symLabel(s),
     kind: "symbol",
   }));
@@ -49,10 +52,11 @@ export function BlastGraph({ symbols }: { symbols: BlastReportSymbol[] }) {
   };
 
   for (const s of symbols) {
+    const sid = symId(s);
     for (const c of s.callers) {
-      const cid = `c:${c.symbol}`;
+      const cid = `c:${c.symbol}@${c.file}`;
       if (!callers.has(cid)) callers.set(cid, { id: cid, label: c.symbol, kind: "caller" });
-      addEdge(`s:${s.name}`, cid);
+      addEdge(sid, cid);
       for (const ep of c.endpoints) {
         const eid = `e:${ep}`;
         if (!targets.has(eid)) targets.set(eid, { id: eid, label: ep, kind: "endpoint" });

@@ -76,7 +76,7 @@ function SymbolNode({
             <span style={s.muted}>{t("tab.noCallers")}</span>
           ) : (
             sym.callers.map((c) => (
-              <div key={`${c.file}:${c.line}`} style={s.callerRow}>
+              <div key={`${c.file}:${c.line}:${c.symbol}`} style={s.callerRow}>
                 <Icon.CornerDownRight size={12} style={s.callerIcon} />
                 <span style={s.callerLink}>{fileLink(c.file, c.line)}</span>
               </div>
