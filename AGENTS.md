@@ -17,6 +17,7 @@ lives in the linked files. No `@import` — follow links lazily, on demand.
 | `server/`        | `@devdigest/api`           | Fastify API + Drizzle/Postgres; hosts `repo-intel` | 3001 |
 | `reviewer-core/` | `@devdigest/reviewer-core` | Pure engine: diff → prompt → LLM → grounded findings | —   |
 | `e2e/`           | `@devdigest/e2e`           | Deterministic browser e2e (agent-browser)        | —    |
+| `mcp-server/`    | `@devdigest/mcp-server`    | Local stdio MCP server: DevDigest agents as MCP tools over HTTP to the API | —    |
 
 ## Commands
 - **Everything up:** `./scripts/dev.sh` (Postgres + API :3001 + web :3000, seeded).
