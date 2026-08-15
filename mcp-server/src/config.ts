@@ -15,7 +15,11 @@ function num(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === '') return fallback;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+  // Set-but-invalid is a config error — fail fast at startup, don't mask it.
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`${name} must be a positive number, got "${raw}"`);
+  }
+  return n;
 }
 
 export function loadConfig(): Config {

@@ -38,7 +38,12 @@ touch the pipeline internals:
 - `getRepoMap(repoId)` → the cached repo skeleton (fed into the **review prompt**).
 - `getFileRank(repoId, files)` → importance percentile per changed file.
 - `getCallerSignatures(repoId, files, limit)` → callers of changed symbols.
-- `getBlastRadius(repoId, files)` → impacted symbols / callers (used by L04).
+- `getBlastRadius(repoId, files)` → impacted symbols / callers (used by L04). Callers
+  are capped **per changed symbol** (see `MAX_CALLERS_PER_SYMBOL`), rank-sorted.
+- `getImpactedEndpoints(repoId, files)` → HTTP endpoints reachable from the changed
+  files via the **reverse** import graph (`file_edges` walked `to_file → from_file`),
+  bounded by `BFS_DEPTH`. Endpoints come from precomputed `file_facts` — pure index
+  read (used by L04's Overview BLAST RADIUS card / `modules/blast`).
 - `getUnresolvedReferences(repoId, …)` → phantom-symbol detection (used by L06).
 - `getConventionSamples(repoId)` → top-ranked files for convention extraction (L02).
 

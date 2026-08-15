@@ -28,12 +28,19 @@ import {
 } from '../../adapters/astgrep/index.js';
 import { readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { RepoIntelRepository, type FullSymbolRow } from './repository.js';
+import {
+  RepoIntelRepository,
+  type FullSymbolRow,
+  type IndexerEdgeRow,
+  type IndexerFileFactsRow,
+} from './repository.js';
 import type {
   BlastCallerRow,
   BlastChangedSymbol,
   BlastResult,
   FileRankRow,
+  ImpactedEndpoint,
+  ImpactedEndpointsResult,
   IndexResult,
   IndexState,
   RefRow,
@@ -369,7 +376,9 @@ export class RepoIntelService implements RepoIntel {
         rank: c.rank,
       });
     }
-    callers.sort((a, b) => b.rank - a.rank);
+    // Cap PER changed symbol (not globally): a hot helper with many callers must
+    // not starve the other changed symbols. Each group is rank-sorted.
+    const cappedCallers = capCallersPerSymbol(callers, MAX_CALLERS_PER_SYMBOL);
 
     // Precomputed facts per caller file (endpoints + crons), so consumers can
     // attribute them to the changed symbol whose callers live in that file.
@@ -383,11 +392,40 @@ export class RepoIntelService implements RepoIntel {
 
     return {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      callers: cappedCallers,
       impactedEndpoints: [...endpoints],
       factsByFile,
       degraded: false,
     };
+  }
+
+  /**
+   * HTTP endpoints reachable from the changed files via the REVERSE import graph.
+   *
+   * The `file_edges` rows are importer→imported (`from_file` imports `to_file`);
+   * reversing them (`to_file → from_file`) walks toward the files that DEPEND ON
+   * the change. We BFS out to `BFS_DEPTH` hops, then read each visited file's
+   * precomputed `file_facts` endpoints. Depth 0 = the changed files themselves
+   * (their own routes are trivially impacted). PURE index read — no clone parse.
+   */
+  async getImpactedEndpoints(
+    repoId: string,
+    changedFiles: string[],
+  ): Promise<ImpactedEndpointsResult> {
+    const empty: ImpactedEndpointsResult = { endpoints: [], degraded: true, reason: 'no_data' };
+    if (!this.container.config.repoIntelEnabled) return { ...empty, reason: 'flag_off' };
+    if (changedFiles.length === 0) return empty;
+
+    const state = await this.repo.tryGetIndexState(repoId);
+    if (!state || (state.status !== 'full' && state.status !== 'partial')) return empty;
+
+    const edges = await this.repo.getEdges(repoId);
+    const depthByFile = reverseReachable(edges, changedFiles, BFS_DEPTH);
+    const facts = await this.repo.getFileFacts(repoId, [...depthByFile.keys()]);
+    const endpoints = mergeImpactedEndpoints(facts, depthByFile);
+    // A `partial` index still resolves endpoints correctly for the files it did
+    // cover — not degraded. Degraded is reserved for "no usable index at all".
+    return { endpoints };
   }
 
   /**
@@ -730,6 +768,87 @@ const JUNK_PATH_PATTERNS = [
 function isJunkPath(path: string): boolean {
   const lower = path.toLowerCase();
   return JUNK_PATH_PATTERNS.some((p) => lower.includes(p));
+}
+
+/**
+ * Reverse-import reachability: from `seeds` (changed files, depth 0), walk the
+ * import edges BACKWARDS (`to_file → from_file`, i.e. toward the files that
+ * DEPEND ON the change) up to `maxDepth` hops. Returns each reachable file with
+ * the smallest depth it was found at. Pure — the unit of the direction guarantee.
+ */
+export function reverseReachable(
+  edges: IndexerEdgeRow[],
+  seeds: string[],
+  maxDepth: number,
+): Map<string, number> {
+  const dependents = new Map<string, string[]>();
+  for (const e of edges) {
+    const arr = dependents.get(e.toFile);
+    if (arr) arr.push(e.fromFile);
+    else dependents.set(e.toFile, [e.fromFile]);
+  }
+
+  const depthByFile = new Map<string, number>();
+  for (const f of seeds) depthByFile.set(f, 0);
+  let frontier = [...new Set(seeds)];
+  for (let depth = 1; depth <= maxDepth && frontier.length > 0; depth += 1) {
+    const next: string[] = [];
+    for (const file of frontier) {
+      for (const dep of dependents.get(file) ?? []) {
+        if (depthByFile.has(dep)) continue;
+        depthByFile.set(dep, depth);
+        next.push(dep);
+      }
+    }
+    frontier = next;
+  }
+  return depthByFile;
+}
+
+/**
+ * Merge per-file endpoint facts into a deduped, depth-attributed list, sorted by
+ * depth then endpoint. Pure.
+ */
+export function mergeImpactedEndpoints(
+  facts: IndexerFileFactsRow[],
+  depthByFile: Map<string, number>,
+): ImpactedEndpoint[] {
+  const byEndpoint = new Map<string, ImpactedEndpoint>();
+  for (const f of facts) {
+    const depth = depthByFile.get(f.filePath) ?? 0;
+    for (const ep of f.endpoints) {
+      const hit = byEndpoint.get(ep);
+      if (hit) {
+        if (!hit.viaFiles.includes(f.filePath)) hit.viaFiles.push(f.filePath);
+        if (depth < hit.depth) hit.depth = depth;
+      } else {
+        byEndpoint.set(ep, { endpoint: ep, viaFiles: [f.filePath], depth });
+      }
+    }
+  }
+  return [...byEndpoint.values()].sort(
+    (a, b) => a.depth - b.depth || a.endpoint.localeCompare(b.endpoint),
+  );
+}
+
+/**
+ * Cap callers PER changed symbol (grouped by `viaSymbol`), each group sorted by
+ * rank DESC, then flattened back — so one hot symbol can't crowd out the others.
+ * Preserves first-seen group order for a stable, deterministic result.
+ */
+function capCallersPerSymbol(callers: BlastCallerRow[], cap: number): BlastCallerRow[] {
+  const groups = new Map<string, BlastCallerRow[]>();
+  for (const c of callers) {
+    const arr = groups.get(c.viaSymbol);
+    if (arr) arr.push(c);
+    else groups.set(c.viaSymbol, [c]);
+  }
+  const out: BlastCallerRow[] = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => b.rank - a.rank);
+    out.push(...group.slice(0, cap));
+  }
+  return out;
 }
 
 /** Enclosing top-level (bare-name) symbol for a line, from persistent rows. */

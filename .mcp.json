@@ -3,8 +3,9 @@
     "devdigest": {
       "command": "npx",
       "args": ["tsx", "mcp-server/src/index.ts"],
+      "timeout": 150000,
       "env": {
-        "MCP_TOOL_TIMEOUT": "120000",
+        "MCP_TOOL_TIMEOUT": "150000",
         "DEVDIGEST_API_URL": "http://localhost:3001"
       }
     }

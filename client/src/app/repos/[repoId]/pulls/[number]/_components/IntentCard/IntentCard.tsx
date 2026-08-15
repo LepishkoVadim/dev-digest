@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, EmptyState, ErrorState, IconBtn, SectionLabel, Skeleton } from "@devdigest/ui";
+import { Badge, EmptyState, ErrorState, Icon, IconBtn, SectionLabel, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
 import { usePrIntent, useDeriveIntent } from "@/lib/hooks/reviews";
 import { s, CONFIDENCE_COLOR } from "./styles";
@@ -30,7 +30,7 @@ export function IntentCard({ prId }: IntentCardProps) {
 
   if (isLoading) {
     return (
-      <section>
+      <section style={s.section}>
         <SectionLabel icon="Target">{t("block.intent")}</SectionLabel>
         <div style={s.card}>
           <Skeleton height={16} style={{ marginBottom: 10 }} />
@@ -43,7 +43,7 @@ export function IntentCard({ prId }: IntentCardProps) {
   if (notFound || !data) {
     if (error && !notFound) {
       return (
-        <section>
+        <section style={s.section}>
           <SectionLabel icon="Target">{t("block.intent")}</SectionLabel>
           <div style={s.card}>
             <ErrorState body={(error as Error).message} onRetry={() => void refetch()} />
@@ -52,7 +52,7 @@ export function IntentCard({ prId }: IntentCardProps) {
       );
     }
     return (
-      <section>
+      <section style={s.section}>
         <SectionLabel icon="Target">{t("block.intent")}</SectionLabel>
         <div style={s.card}>
           <EmptyState
@@ -75,7 +75,7 @@ export function IntentCard({ prId }: IntentCardProps) {
   const confColor = confidence ? CONFIDENCE_COLOR[confidence] : undefined;
 
   return (
-    <section>
+    <section style={s.section}>
       <SectionLabel
         icon="Target"
         right={
@@ -94,25 +94,38 @@ export function IntentCard({ prId }: IntentCardProps) {
       </SectionLabel>
 
       <div style={s.card}>
-        <div style={s.summary}>{data.intent}</div>
+        <div style={s.summary}>{`“${data.intent}”`}</div>
 
-        {data.in_scope.length > 0 && (
-          <div style={s.scopeRow}>
-            <span style={s.scopeLabel}>{t("inScope")}</span>
-            {data.in_scope.map((item) => (
-              <Badge key={item}>{item}</Badge>
-            ))}
-          </div>
-        )}
-
-        {data.out_of_scope.length > 0 && (
-          <div style={s.scopeRow}>
-            <span style={s.scopeLabel}>{t("outOfScope")}</span>
-            {data.out_of_scope.map((item) => (
-              <Badge key={item} color="var(--text-muted)">
-                {item}
-              </Badge>
-            ))}
+        {(data.in_scope.length > 0 || data.out_of_scope.length > 0) && (
+          <div style={s.scopeCols}>
+            {data.in_scope.length > 0 && (
+              <div style={s.scopeCol}>
+                <div style={s.scopeHead}>
+                  <Icon.Check size={13} style={{ color: "var(--ok, #4ade80)" }} />
+                  <span style={s.scopeHeadLabel(true)}>{t("inScope")}</span>
+                </div>
+                {data.in_scope.map((item) => (
+                  <div key={item} style={s.scopeItem}>
+                    <span style={s.dot}>·</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.out_of_scope.length > 0 && (
+              <div style={s.scopeCol}>
+                <div style={s.scopeHead}>
+                  <Icon.X size={13} style={{ color: "var(--text-muted)" }} />
+                  <span style={s.scopeHeadLabel(false)}>{t("outOfScope")}</span>
+                </div>
+                {data.out_of_scope.map((item) => (
+                  <div key={item} style={s.scopeItem}>
+                    <span style={s.dot}>·</span>
+                    <span style={s.scopeItemMuted}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

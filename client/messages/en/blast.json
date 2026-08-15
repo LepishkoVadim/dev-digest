@@ -10,9 +10,36 @@
     "graph": "graph"
   },
   "callerCount": "{count} callers",
+  "seeAll": "See all {count} symbols",
+  "allSymbols": "All {count} changed symbols, ranked by callers",
   "noDownstream": "{count} changed symbol(s), no downstream callers found.",
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "tab": {
+    "title": "Blast radius",
+    "subtitle": "What else this diff could touch — built from the code index, no review needed.",
+    "changedSymbols": "Changed symbols",
+    "callers": "Callers",
+    "impactedEndpoints": "Potentially impacted endpoints",
+    "noCallers": "No cross-file callers found for this symbol.",
+    "noEndpoints": "No HTTP endpoints reach these changes.",
+    "via": "via",
+    "depth": "depth {depth}",
+    "changedFile": "declared in {file}"
+  },
+  "priorPrs": {
+    "title": "Prior PRs touching these files",
+    "overlap": "{count} shared files"
+  },
+  "state": {
+    "loading": "Loading blast radius…",
+    "errorTitle": "Couldn't load the blast radius",
+    "emptyTitle": "No blast radius for this PR",
+    "emptyBody": "The code index is healthy, but the changed files have no indexed symbols or callers (e.g. non-code files, or the diff hasn't been imported yet).",
+    "degradedTitle": "Index unavailable",
+    "degradedBody": "No usable code index for this repository yet, so impact can't be mapped. Re-analyze the repo in DevDigest to build the index.",
+    "partialBanner": "The code index is partial, so this map may be incomplete."
   }
 }
