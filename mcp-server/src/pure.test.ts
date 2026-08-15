@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { matchRepo, matchPull } from './http/resolve.js';
 import { toolOk, toolError } from './format.js';
 import { summarizeBlast } from './tools/get-blast-radius.js';
-import type { RepoDto, PrMetaDto, BlastReportDto } from './http/client.js';
+import { buildFindingsResponse } from './tools/get-findings.js';
+import { loadConfig } from './config.js';
+import type { RepoDto, PrMetaDto, BlastReportDto, ReviewDto } from './http/client.js';
 
 const repos: RepoDto[] = [
   { id: 'r1', owner: 'acme', name: 'api', full_name: 'acme/api' },
@@ -104,6 +106,48 @@ describe('summarizeBlast', () => {
       author: 'dev',
       shared_files: 1,
     });
+  });
+});
+
+describe('loadConfig', () => {
+  it('throws on a set-but-invalid numeric env (fail fast, no silent fallback)', () => {
+    const prev = process.env.DEVDIGEST_POLL_BUDGET_MS;
+    process.env.DEVDIGEST_POLL_BUDGET_MS = 'abc';
+    expect(() => loadConfig()).toThrow(/positive number/);
+    if (prev === undefined) delete process.env.DEVDIGEST_POLL_BUDGET_MS;
+    else process.env.DEVDIGEST_POLL_BUDGET_MS = prev;
+  });
+});
+
+describe('buildFindingsResponse', () => {
+  const reviews: ReviewDto[] = [
+    {
+      run_id: 'r1',
+      agent_name: 'General',
+      verdict: 'request_changes',
+      score: 61,
+      findings: [
+        { severity: 'CRITICAL', title: 'x', file: 'a.ts', start_line: 1, end_line: 1, rationale: 'r' },
+      ],
+    },
+    { run_id: 'r2', agent_name: 'Security', verdict: 'approve', score: 90, findings: [] },
+  ];
+
+  it('all_runs returns every review with total_findings', () => {
+    const b = buildFindingsResponse(reviews, { allRuns: true, detailed: false, offset: 0, limit: 50 });
+    expect(b?.reviews).toHaveLength(2);
+    expect(b?.total_findings).toBe(1);
+  });
+
+  it('default returns just the matched/latest review (still an array)', () => {
+    const b = buildFindingsResponse(reviews, { allRuns: false, detailed: false, offset: 0, limit: 50 });
+    expect(b?.reviews).toHaveLength(1);
+    expect(b?.reviews[0]!.run_id).toBe('r1');
+  });
+
+  it('run_id selects a specific run', () => {
+    const b = buildFindingsResponse(reviews, { runId: 'r2', allRuns: false, detailed: false, offset: 0, limit: 50 });
+    expect(b?.reviews[0]!.run_id).toBe('r2');
   });
 });
 

@@ -7,7 +7,7 @@ import { resolvePullId } from '../http/resolve.js';
 import { log } from '../log.js';
 
 const DESCRIPTION =
-  "Fetches findings for an already-completed review, without starting a new run. Identify it by run_id (from devdigest_run_agent_on_pr) or by repo + pr. response_format 'concise' (default) returns verdict, score and paginated findings (severity, title, file:line); 'detailed' adds rationale and suggestion. Use offset/limit to page large sets. Read-only.";
+  "Fetches findings for a PR's reviews, without starting a new run. Identify by run_id (from devdigest_run_agent_on_pr) or repo + pr. Returns a `reviews` array (one per run) plus `total_findings`; by default just the matched/latest run, or all_runs:true for every run (a 'Run Review' can fan out to many agents). response_format 'concise' (default) = severity/title/file:line per finding; 'detailed' adds rationale/suggestion. offset/limit page each review's findings. Read-only.";
 
 function shape(f: FindingDto, detailed: boolean) {
   const base = { severity: f.severity, title: f.title, file: f.file, line: f.start_line };
@@ -19,6 +19,35 @@ function shape(f: FindingDto, detailed: boolean) {
 function pickReview(reviews: ReviewDto[], runId?: string): ReviewDto | undefined {
   if (runId) return reviews.find((r) => r.run_id === runId);
   return reviews[0];
+}
+
+interface FindingsOpts {
+  runId?: string;
+  allRuns: boolean;
+  detailed: boolean;
+  offset: number;
+  limit: number;
+}
+
+/** Shape the reviews into the tool response (pure). null = no matching review. */
+export function buildFindingsResponse(reviews: ReviewDto[], o: FindingsOpts) {
+  const selected = o.allRuns
+    ? reviews
+    : ((r) => (r ? [r] : []))(pickReview(reviews, o.runId));
+  if (selected.length === 0) return null;
+  return {
+    reviews: selected.map((r) => ({
+      run_id: r.run_id,
+      agent_name: r.agent_name ?? null,
+      verdict: r.verdict,
+      score: r.score,
+      total: r.findings.length,
+      findings: r.findings.slice(o.offset, o.offset + o.limit).map((f) => shape(f, o.detailed)),
+    })),
+    total_findings: selected.reduce((n, r) => n + r.findings.length, 0),
+    offset: o.offset,
+    limit: o.limit,
+  };
 }
 
 export function registerGetFindings(server: McpServer, client: ApiClient): void {
@@ -40,6 +69,10 @@ export function registerGetFindings(server: McpServer, client: ApiClient): void 
           .describe("'concise' = severity/title/file:line; 'detailed' adds rationale/suggestion."),
         offset: z.number().int().min(0).default(0).describe('Findings to skip (pagination).'),
         limit: z.number().int().min(1).max(100).default(50).describe('Max findings to return.'),
+        all_runs: z
+          .boolean()
+          .default(false)
+          .describe('Return every run\'s review (array), not just the matched/latest one.'),
       },
       annotations: {
         readOnlyHint: true,
@@ -48,7 +81,7 @@ export function registerGetFindings(server: McpServer, client: ApiClient): void 
         openWorldHint: true,
       },
     },
-    async ({ run_id, repo, pr, response_format, offset, limit }) => {
+    async ({ run_id, repo, pr, response_format, offset, limit, all_runs }) => {
       try {
         // Need a PR id to read /pulls/:id/reviews. Derive it from repo+pr when
         // run_id alone is given, there's no run→pr endpoint, so require repo+pr.
@@ -62,27 +95,21 @@ export function registerGetFindings(server: McpServer, client: ApiClient): void 
         if (!pull.ok) return toolError(pull.message, { recovery: pull.recovery });
 
         const reviews = await client.reviewsForPull(pull.value.pullId);
-        const review = pickReview(reviews, run_id);
-        if (!review) {
+        const body = buildFindingsResponse(reviews, {
+          runId: run_id,
+          allRuns: all_runs,
+          detailed: response_format === 'detailed',
+          offset,
+          limit,
+        });
+        if (!body) {
           const recovery = run_id
             ? 'No review for that run_id yet — the run may still be in progress; retry later.'
             : 'This PR has no completed review yet — run devdigest_run_agent_on_pr first.';
           // Empty is a success, but "no matching review" is a not-found — flag it.
           return toolError('No matching review found.', { recovery });
         }
-
-        const detailed = response_format === 'detailed';
-        const total = review.findings.length;
-        const page = review.findings.slice(offset, offset + limit).map((f) => shape(f, detailed));
-        return toolOk({
-          run_id: review.run_id,
-          verdict: review.verdict,
-          score: review.score,
-          total,
-          offset,
-          limit,
-          findings: page,
-        });
+        return toolOk(body);
       } catch (err) {
         if (err instanceof ApiUnreachableError) {
           return toolError(err.message, {
