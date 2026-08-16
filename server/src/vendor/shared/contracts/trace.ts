@@ -36,6 +36,18 @@ export const ToolCall = z.object({
 });
 export type ToolCall = z.infer<typeof ToolCall>;
 
+/**
+ * One resolved context-doc read at run time. `tokens` is the tokenizer count of
+ * the body actually sent (0 when skipped); `skipped` is true only when the doc
+ * was not sent (missing / oversized / path-escape / decode failure).
+ */
+export const SpecRead = z.object({
+  path: z.string(),
+  tokens: z.number().int(),
+  skipped: z.boolean(),
+});
+export type SpecRead = z.infer<typeof SpecRead>;
+
 export const PromptAssembly = z.object({
   system: z.string(),
   skills: z.string().nullish(),
@@ -87,7 +99,7 @@ export const RunTrace = z.object({
   tool_calls: z.array(ToolCall),
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
-  specs_read: z.array(z.string()),
+  specs_read: z.array(SpecRead),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

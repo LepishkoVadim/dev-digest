@@ -1,6 +1,6 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
-import { join } from 'node:path';
-import { mkdir, readFile, access, rm } from 'node:fs/promises';
+import { join, relative, resolve, sep } from 'node:path';
+import { mkdir, readFile, access, rm, realpath, readdir } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import type {
   GitClient,
@@ -18,6 +18,36 @@ import { parseUnifiedDiff } from './diff-parser.js';
  * when it isn't, the indexer falls back to a full reindex.
  */
 const RESYNC_FETCH_DEPTH = 50;
+
+/**
+ * Hard cap on `.md` matches returned by {@link SimpleGitClient.walkFiles}. A repo
+ * with more docs than this is truncated (the editor filter narrows it). Keeps the
+ * doc-list walk bounded (NFR-1).
+ */
+const MAX_WALK_MATCHES = 500;
+
+/**
+ * Thrown by {@link SimpleGitClient.readFile} when a supplied path resolves
+ * outside the repo's clone directory (`..`, absolute path, or a symlink escaping
+ * the clone). Callers (e.g. the run-executor doc reader) treat it as a skip.
+ */
+export class PathEscapesCloneError extends Error {
+  constructor(path: string) {
+    super(`Path escapes clone directory: ${path}`);
+    this.name = 'PathEscapesCloneError';
+  }
+}
+
+/**
+ * True when `child` (an already-realpath'd absolute path) is the same as or
+ * nested under `parent` (also realpath'd). Uses `path.relative` rather than a
+ * string `startsWith`, so `/clone-evil` is not treated as inside `/clone`.
+ */
+function isInside(parent: string, child: string): boolean {
+  if (child === parent) return true;
+  const rel = relative(parent, child);
+  return rel.length > 0 && !rel.startsWith('..') && !rel.startsWith(`..${sep}`);
+}
 
 /**
  * GitClient over simple-git. Repos clone to
@@ -126,8 +156,81 @@ export class SimpleGitClient implements GitClient {
     }));
   }
 
+  /**
+   * Read a repo-relative file from the clone, AFTER asserting the resolved path
+   * stays inside the clone dir. Root-cause containment guard (server INSIGHTS
+   * 2026-08-16): the path may be attacker/owner-supplied (Project Context docs),
+   * so a bare `join` would let `../../etc/passwd`, an absolute path, or an
+   * in-clone symlink pointing outside escape the sandbox.
+   *
+   * We `realpath` BOTH the clone dir and the resolved target so a symlink whose
+   * textual path is in-clone but which points outside is still rejected — a
+   * naive `startsWith` on the joined string misses that. Throws
+   * {@link PathEscapesCloneError} before any read when containment fails.
+   */
   async readFile(repo: RepoRef, path: string): Promise<string> {
-    return readFile(join(this.clonePathFor(repo), path), 'utf8');
+    const cloneRoot = await realpath(this.clonePathFor(repo));
+    // Resolve the requested path against the clone root. `resolve` collapses
+    // `..` segments and makes an absolute input absolute (which then fails the
+    // containment check below unless it happens to sit inside the clone).
+    const target = resolve(cloneRoot, path);
+    // realpath the target so an in-clone symlink pointing outside is unmasked.
+    // The file may not exist yet — realpath throws ENOENT; fall back to the
+    // lexically-resolved path (a non-existent path can't be a symlink escape,
+    // and the subsequent readFile surfaces the ENOENT to the caller as a skip).
+    let real: string;
+    try {
+      real = await realpath(target);
+    } catch {
+      real = target;
+    }
+    if (!isInside(cloneRoot, real)) throw new PathEscapesCloneError(path);
+    return readFile(real, 'utf8');
+  }
+
+  /**
+   * Enumerate files under the clone matching `predicate(relPath)`, confined to
+   * the clone dir. Symlinked directories are NOT descended (containment: a
+   * symlink out of the clone must not leak files into the list). Returns
+   * repo-relative POSIX-style paths, capped at {@link MAX_WALK_MATCHES}.
+   *
+   * The doc walk (AC-2) reads only paths here, never `readFile`; token counting
+   * of matched files happens in the service with its own size cap.
+   */
+  async walkFiles(repo: RepoRef, predicate: (relPath: string) => boolean): Promise<string[]> {
+    let root: string;
+    try {
+      root = await realpath(this.clonePathFor(repo));
+    } catch {
+      // Uncloned repo → no clone dir. Empty list (the reader shows empty state).
+      return [];
+    }
+    const out: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      if (out.length >= MAX_WALK_MATCHES) return;
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (out.length >= MAX_WALK_MATCHES) return;
+        // Skip symlinks entirely — a symlinked file or dir could point outside
+        // the clone; we never follow one in the walk.
+        if (e.isSymbolicLink()) continue;
+        if (e.name === '.git') continue;
+        const abs = join(dir, e.name);
+        if (e.isDirectory()) {
+          await walk(abs);
+        } else if (e.isFile()) {
+          const rel = relative(root, abs).split(sep).join('/');
+          if (predicate(rel)) out.push(rel);
+        }
+      }
+    };
+    await walk(root);
+    return out;
   }
 }
 

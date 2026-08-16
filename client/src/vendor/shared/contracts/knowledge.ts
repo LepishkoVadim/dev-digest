@@ -128,6 +128,12 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  // Ordered repo-relative `.md` doc paths attached to this skill (Project
+  // Context). Bare paths, no repo id. Defaults to [] so older rows parse.
+  doc_paths: z.array(z.string()).default([]),
+  // Number of agents whose linked-skill set includes this skill. Computed on
+  // read; nullish when not requested (list vs detail).
+  used_by_agents: z.number().int().nullish(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -192,6 +198,9 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  // Ordered repo-relative `.md` doc paths attached to this agent (Project
+  // Context). Bare paths, no repo id. Defaults to [] so older rows parse.
+  doc_paths: z.array(z.string()).default([]),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -216,6 +225,9 @@ export const AgentVersionConfig = z.object({
   ci_fail_on: CiFailOn,
   repo_intel: z.boolean(),
   skills: z.array(z.string()),
+  // Snapshotted attached doc paths at version time. Defaults to [] so older
+  // agent_versions rows (written before this feature) still parse.
+  doc_paths: z.array(z.string()).default([]),
 });
 export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
 

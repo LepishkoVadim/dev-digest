@@ -10,6 +10,7 @@ export interface EditorTab {
 /** Editor tabs, mirroring the agent editor shape. */
 export const TABS: readonly EditorTab[] = [
   { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
+  { key: "context", labelKey: "editor.tabs.context", icon: "Folder" },
   { key: "preview", labelKey: "editor.tabs.preview", icon: "Eye" },
   { key: "versions", labelKey: "editor.tabs.versions", icon: "History" },
   { key: "stats", labelKey: "editor.tabs.stats", icon: "BarChart" },

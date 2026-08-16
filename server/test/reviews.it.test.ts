@@ -227,6 +227,69 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('attaches context docs into specs_read: sent one, skipped a missing + a traversal (AC-11/15/17/19)', async () => {
+    // Git mock carrying one real in-clone doc. Missing + traversal paths are
+    // absent from `files` / rejected by the mock's containment guard → skipped.
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({
+          diff: DIFF,
+          files: { 'specs/rule.md': '# Rule\n\napi/ must not import db/ directly.' },
+        }),
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          openrouter: new MockLLMProvider('openai', {
+            structuredBySchema: {
+              Intent: { intent: 'stub intent', in_scope: [], out_of_scope: [] },
+            },
+          }) as unknown as LLMProvider,
+        },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: {
+          name: 'CtxSec',
+          provider: 'openai',
+          model: 'gpt-4.1',
+          system_prompt: 'sec',
+          doc_paths: ['specs/rule.md', 'specs/missing.md', '../../etc/passwd'],
+        },
+      })
+    ).json();
+    expect(agent.doc_paths).toEqual(['specs/rule.md', 'specs/missing.md', '../../etc/passwd']);
+
+    const body = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json();
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const runId = body.runs[0].run_id;
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+
+    // One entry per deduped path, in order; the real doc sent (tokens>0), the
+    // two bad ones skipped with tokens 0.
+    expect(trace.specs_read).toEqual([
+      { path: 'specs/rule.md', tokens: expect.any(Number), skipped: false },
+      { path: 'specs/missing.md', tokens: 0, skipped: true },
+      { path: '../../etc/passwd', tokens: 0, skipped: true },
+    ]);
+    expect(trace.specs_read[0].tokens).toBeGreaterThan(0);
+    // The sent body is rendered under ## Project context in prompt assembly.
+    expect(trace.prompt_assembly.specs).toContain('api/ must not import db/');
+    // The Live Log line is emitted for the one sent doc.
+    expect(trace.log.some((l: { msg: string }) => l.msg.includes('Specs: 1 context doc(s) attached to prompt'))).toBe(true);
+
+    await app.close();
+  });
+
   it('marks the run failed (never silently) when the LLM throws mid-review', async () => {
     // A provider that blows up inside completeStructured — exercises the
     // run-executor catch path: status→failed, error persisted, no review written.

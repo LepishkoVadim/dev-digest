@@ -59,6 +59,11 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /**
+   * Top-level directory names whose `.md` files are listed as Project Context
+   * docs (plus a top-level README.md, badged `readme`). Operator-controlled.
+   */
+  docRoots: string[];
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -77,5 +82,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    // Default Project Context roots. Fixed for v1 (no env knob yet); a doc lives
+    // under one of these dirs (any depth) or is the top-level README.md.
+    docRoots: ['specs', 'docs', 'insights'],
   };
 }

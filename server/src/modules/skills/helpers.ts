@@ -10,8 +10,12 @@ import { DEFAULT_SKILL_NAME } from './constants.js';
  * only), no filesystem, no execution of archive entries.
  */
 
-/** Map a persisted skill row to the public `Skill` DTO. */
-export function toSkillDto(row: SkillRow): Skill {
+/**
+ * Map a persisted skill row to the public `Skill` DTO. `usedByAgents` is the
+ * cross-entity count (agents linking this skill), computed on read by the
+ * service; omitted → `used_by_agents` is null.
+ */
+export function toSkillDto(row: SkillRow, usedByAgents?: number): Skill {
   return {
     id: row.id,
     name: row.name,
@@ -22,6 +26,8 @@ export function toSkillDto(row: SkillRow): Skill {
     enabled: row.enabled,
     version: row.version,
     evidence_files: row.evidenceFiles ?? null,
+    doc_paths: row.docPaths ?? [],
+    used_by_agents: usedByAgents ?? null,
   };
 }
 

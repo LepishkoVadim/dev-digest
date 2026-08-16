@@ -1,12 +1,15 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type { Provider, Review, RunTrace, SpecRead, UnifiedDiff, RepoRef } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow, StoredIntent } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine, resolveSkillBlocks } from './helpers.js';
+import { taskLine, resolveSkillBlocks, resolveDocPaths } from './helpers.js';
+
+/** Per-doc raw-size cap before token counting / sending (AC-18 / NFR-2). */
+const MAX_DOC_BYTES = 400 * 1024;
 import { renderIntentBlock } from './intent.js';
 import { loadDiff } from './diff-loader.js';
 import { estimateCost } from '../../adapters/llm/pricing.js';
@@ -215,8 +218,20 @@ export class ReviewRunExecutor {
 
       // Agent's linked skills (ordered) → prompt `## Skills / rules` blocks.
       // Disabled skills are dropped; non-manual bodies are wrapped as untrusted.
-      const blocks = resolveSkillBlocks(await this.agents.linkedSkills(agent.id));
+      const linkedSkills = await this.agents.linkedSkills(agent.id);
+      const blocks = resolveSkillBlocks(linkedSkills);
       if (blocks.length) runLog.info(`${blocks.length} skill(s) attached to the prompt`);
+
+      // Project Context docs: agent's own doc_paths first, then linked skills'
+      // doc_paths in link order, dedup keep-first (AC-11). Each is read from the
+      // clone via the containment-guarded git.readFile; a missing / oversized /
+      // path-escaping / undecodable doc is skipped and recorded. Fills the
+      // dormant `specs` slot (## Project context) — no new LLM call.
+      const { specs, specsRead } = await this.buildContextDocs(
+        { owner: repo.owner, name: repo.name },
+        resolveDocPaths(agent.docPaths, linkedSkills),
+        runLog,
+      );
 
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
@@ -243,6 +258,10 @@ export class ReviewRunExecutor {
         ...(intentBlock ? { intent: intentBlock } : {}),
         // Agent's enabled skills as prompt rules (omitted when none).
         ...(blocks.length ? { skills: blocks } : {}),
+        // Attached context-doc bodies → `## Project context`. assemblePrompt
+        // wraps each with wrapUntrusted ITSELF, so we pass RAW bodies here (never
+        // pre-wrapped). Omitted when nothing was read (AC-20: identical to today).
+        ...(specs.length ? { specs } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -323,7 +342,7 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        specs_read: specsRead,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -393,6 +412,51 @@ export class ReviewRunExecutor {
       );
       return undefined;
     }
+  }
+
+  /**
+   * Read the attached context docs (deduped, ordered — AC-11) from the clone and
+   * split them into `specs` (raw bodies to send) and `specsRead` (one trace entry
+   * per path). Every failure mode is a per-doc SKIP that records `{tokens:0,
+   * skipped:true}` and continues (AC-17/18/19): containment error (path escapes
+   * the clone), missing path, non-UTF-8/decode failure, or raw size > 400 KB. The
+   * body of a skipped doc is NEVER sent. No new LLM call.
+   *
+   * Emits the Live Log line only when ≥1 doc was actually sent (AC-14/AC-20).
+   */
+  private async buildContextDocs(
+    ref: RepoRef,
+    paths: string[],
+    runLog: RunLogger,
+  ): Promise<{ specs: string[]; specsRead: SpecRead[] }> {
+    const specs: string[] = [];
+    const specsRead: SpecRead[] = [];
+    if (paths.length === 0) return { specs, specsRead };
+
+    for (const path of paths) {
+      let body: string;
+      try {
+        // Containment-guarded (git.readFile resolves + realpaths + asserts
+        // in-clone; a traversal / symlink escape throws before any read).
+        body = await this.container.git.readFile(ref, path);
+      } catch {
+        specsRead.push({ path, tokens: 0, skipped: true });
+        continue;
+      }
+      // Oversized raw doc → skip, never send (AC-18 / NFR-2).
+      if (Buffer.byteLength(body, 'utf8') > MAX_DOC_BYTES) {
+        specsRead.push({ path, tokens: 0, skipped: true });
+        continue;
+      }
+      const tokens = this.container.tokenizer.count(body);
+      specs.push(body);
+      specsRead.push({ path, tokens, skipped: false });
+    }
+
+    if (specs.length > 0) {
+      runLog.info(`Specs: ${specs.length} context doc(s) attached to prompt`);
+    }
+    return { specs, specsRead };
   }
 
   /**

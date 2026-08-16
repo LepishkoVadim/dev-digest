@@ -43,6 +43,7 @@ const UpdateSkillBody = z.object({
   type: SkillType.optional(),
   body: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
+  doc_paths: z.array(z.string()).optional(),
 });
 
 const ImportFileBody = z.object({ name: z.string().optional(), body: z.string().min(1) });

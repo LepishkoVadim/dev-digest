@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Tabs, Badge, Button, Icon } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { ConfigTab } from "./_components/ConfigTab";
+import { ContextSection } from "./_components/ContextSection";
 import { PreviewTab } from "./_components/PreviewTab";
 import { VersionsTab } from "./_components/VersionsTab";
 import { StatsTab } from "./_components/StatsTab";
@@ -42,6 +43,7 @@ export function SkillEditor({ skill, tab, onTab }: { skill: Skill; tab: string; 
       </div>
       <div style={s.body}>
         {tab === "config" && <ConfigTab skill={skill} />}
+        {tab === "context" && <ContextSection skill={skill} />}
         {tab === "preview" && <PreviewTab skill={skill} />}
         {tab === "versions" && <VersionsTab skill={skill} />}
         {tab === "stats" && <StatsTab skill={skill} />}

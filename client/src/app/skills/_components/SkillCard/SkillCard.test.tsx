@@ -17,6 +17,7 @@ const SKILL: Skill = {
   body: "# Rule",
   enabled: true,
   version: 1,
+  doc_paths: [],
 };
 
 function renderWithIntl(ui: React.ReactElement) {

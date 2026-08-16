@@ -291,7 +291,24 @@ export class MockGitClient implements GitClient {
     return [{ sha: 'a1b2c3d4', message: 'init', author: 'marisa.koch', date: '2026-06-01' }];
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
-    return this.opts.files?.[path] ?? '';
+    // Mirror the real adapter's containment guard so run-path tests exercise
+    // the skip-on-escape branch. A path with `..` or an absolute path escapes.
+    if (path.startsWith('/') || path.split('/').includes('..')) {
+      const err = new Error(`Path escapes clone directory: ${path}`);
+      err.name = 'PathEscapesCloneError';
+      throw err;
+    }
+    const body = this.opts.files?.[path];
+    // Missing file → throw like fs ENOENT so the caller records a skip.
+    if (body === undefined) {
+      const err = new Error(`ENOENT: no such file, open '${path}'`);
+      (err as NodeJS.ErrnoException).code = 'ENOENT';
+      throw err;
+    }
+    return body;
+  }
+  async walkFiles(_repo: RepoRef, predicate: (relPath: string) => boolean): Promise<string[]> {
+    return Object.keys(this.opts.files ?? {}).filter(predicate);
   }
 }
 

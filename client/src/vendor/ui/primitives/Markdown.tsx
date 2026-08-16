@@ -14,20 +14,31 @@ export function Markdown({ children }: { children?: string | null }) {
           strong: ({ children }) => (
             <strong style={{ fontWeight: 650, color: "var(--text-primary)" }}>{children}</strong>
           ),
-          code: ({ children }) => (
-            <code
-              className="mono"
-              style={{
-                fontSize: "0.92em",
-                padding: "1px 6px",
-                borderRadius: 4,
-                background: "var(--bg-hover)",
-                color: "var(--accent-text)",
-              }}
-            >
-              {children}
-            </code>
-          ),
+          // Block fences (```lang) render <pre><code>; .dd-md CSS styles the <pre>.
+          // Only INLINE code gets the chip style — otherwise a whole code block
+          // renders as one giant chip (the bug in the old single-code renderer).
+          pre: ({ children }) => <pre>{children}</pre>,
+          code: ({ className, children }) => {
+            const isBlock =
+              Boolean(className?.includes("language-")) || String(children ?? "").includes("\n");
+            if (isBlock) {
+              return <code className={`mono ${className ?? ""}`.trim()}>{children}</code>;
+            }
+            return (
+              <code
+                className="mono"
+                style={{
+                  fontSize: "0.92em",
+                  padding: "1px 6px",
+                  borderRadius: 4,
+                  background: "var(--bg-hover)",
+                  color: "var(--accent-text)",
+                }}
+              >
+                {children}
+              </code>
+            );
+          },
           a: ({ children, href }) => (
             <a href={href} style={{ color: "var(--accent-text)", textDecoration: "underline" }}>
               {children}

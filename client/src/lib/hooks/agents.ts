@@ -53,6 +53,7 @@ export interface UpdateAgentInput {
       | "strategy"
       | "ci_fail_on"
       | "repo_intel"
+      | "doc_paths"
       | "enabled"
     >
   >;
@@ -65,6 +66,8 @@ export function useUpdateAgent() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       qc.setQueryData(["agent", data.id], data);
+      // Doc attachments change per-doc "Used by N agents" counts.
+      qc.invalidateQueries({ queryKey: ["docs"] });
     },
   });
 }

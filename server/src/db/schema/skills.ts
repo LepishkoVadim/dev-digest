@@ -17,6 +17,10 @@ export const skills = pgTable('skills', {
   enabled: boolean('enabled').notNull().default(true),
   version: integer('version').notNull().default(1),
   evidenceFiles: jsonb('evidence_files').$type<string[]>(),
+  // Ordered repo-relative `.md` doc paths attached to this skill (Project
+  // Context). Order is load-bearing (injection order). Mirrors evidenceFiles
+  // but NOT NULL default [] since attachment order matters and empty is valid.
+  docPaths: jsonb('doc_paths').$type<string[]>().notNull().default([]),
   createdAt: now(),
 });
 
