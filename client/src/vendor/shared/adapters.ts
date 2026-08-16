@@ -223,8 +223,19 @@ export interface GitClient {
   diffNameOnly(repo: RepoRef, base: string, head: string): Promise<string[]>;
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
+  /**
+   * Read a repo-relative file from the clone. The path is validated for
+   * clone-dir containment first (resolve + realpath both sides); a path that
+   * escapes (`..`, absolute, symlink out) throws before any read.
+   */
   readFile(repo: RepoRef, path: string): Promise<string>;
   clonePathFor(repo: RepoRef): string;
+  /**
+   * Enumerate repo-relative file paths under the clone matching `predicate`,
+   * confined to the clone dir (symlinked dirs are not descended). Returns
+   * POSIX-style paths, capped by the adapter. Empty when the repo isn't cloned.
+   */
+  walkFiles(repo: RepoRef, predicate: (relPath: string) => boolean): Promise<string[]>;
 }
 
 // ---------- CodeIndex (ripgrep + tree-sitter) ----------

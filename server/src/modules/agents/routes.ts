@@ -40,6 +40,7 @@ const CreateAgentBody = z.object({
   strategy: ReviewStrategy.optional(),
   ci_fail_on: CiFailOn.optional(),
   repo_intel: z.boolean().optional(),
+  doc_paths: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -53,6 +54,7 @@ const UpdateAgentBody = z.object({
   strategy: ReviewStrategy.optional(),
   ci_fail_on: CiFailOn.optional(),
   repo_intel: z.boolean().optional(),
+  doc_paths: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -98,6 +100,7 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
         ...(body.strategy !== undefined ? { strategy: body.strategy } : {}),
         ...(body.ci_fail_on !== undefined ? { ci_fail_on: body.ci_fail_on } : {}),
         ...(body.repo_intel !== undefined ? { repo_intel: body.repo_intel } : {}),
+        ...(body.doc_paths !== undefined ? { doc_paths: body.doc_paths } : {}),
         ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
       },
       userId,

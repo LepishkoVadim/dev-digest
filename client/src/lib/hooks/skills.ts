@@ -37,7 +37,7 @@ export function useCreateSkill() {
 
 export interface UpdateSkillInput {
   id: string;
-  patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled">>;
+  patch: Partial<Pick<Skill, "name" | "description" | "type" | "body" | "enabled" | "doc_paths">>;
 }
 
 export function useUpdateSkill() {
@@ -47,6 +47,8 @@ export function useUpdateSkill() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.setQueryData(["skill", data.id], data);
+      // Skill doc attachments feed agents' resolved doc sets → refresh counts.
+      qc.invalidateQueries({ queryKey: ["docs"] });
     },
   });
 }

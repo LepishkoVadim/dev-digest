@@ -34,6 +34,7 @@ export interface UpdateSkill {
   type?: SkillType;
   body?: string;
   enabled?: boolean;
+  docPaths?: string[];
 }
 
 /** Aggregated finding stats for a skill over the trailing 30 days. */
@@ -118,6 +119,7 @@ export class SkillsRepository {
         ...(patch.type !== undefined ? { type: patch.type } : {}),
         ...(patch.body !== undefined ? { body: patch.body } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.docPaths !== undefined ? { docPaths: patch.docPaths } : {}),
         ...(bodyChanged ? { version: nextVersion } : {}),
       })
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
@@ -169,6 +171,27 @@ export class SkillsRepository {
     const snapshot = await this.getVersion(id, version);
     if (!snapshot) return undefined;
     return this.update(workspaceId, id, { body: snapshot.body });
+  }
+
+  /**
+   * "Used by N agents" per skill (AC-21): the count of agents (in this
+   * workspace) whose linked-skill set includes each skill id. One `inArray`
+   * query over `agent_skills ⋈ agents`, grouped in JS into a Map — the on-read
+   * cross-entity pattern (server INSIGHTS 2026-07-31), no cross-module import.
+   */
+  async usedByAgentsCounts(
+    workspaceId: string,
+    skillIds: string[],
+  ): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (skillIds.length === 0) return counts;
+    const rows = await this.db
+      .select({ skillId: t.agentSkills.skillId })
+      .from(t.agentSkills)
+      .innerJoin(t.agents, eq(t.agentSkills.agentId, t.agents.id))
+      .where(and(inArray(t.agentSkills.skillId, skillIds), eq(t.agents.workspaceId, workspaceId)));
+    for (const r of rows) counts.set(r.skillId, (counts.get(r.skillId) ?? 0) + 1);
+    return counts;
   }
 
   // ---- read-only stats (real data only; no fabrication) -------------------

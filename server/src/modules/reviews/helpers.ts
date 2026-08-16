@@ -30,6 +30,34 @@ export function resolveSkillBlocks(
     );
 }
 
+/**
+ * Build the ordered, deduped context-doc path set for a run (AC-11): the agent's
+ * own `doc_paths` first (in stored order), then each linked skill's `doc_paths`
+ * in skill-link order. Deduplicate by path keeping the FIRST occurrence (agent
+ * order wins over a skill-inherited duplicate). Pure — unit-testable.
+ *
+ * The skill shape is taken structurally (`{ skill: { docPaths } }`) so this does
+ * not import another module's row type and add an arch edge.
+ */
+export function resolveDocPaths(
+  agentDocPaths: string[] | null | undefined,
+  linkedSkills: { skill: { docPaths: string[] | null } }[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (paths: string[] | null | undefined) => {
+    for (const p of paths ?? []) {
+      if (!seen.has(p)) {
+        seen.add(p);
+        out.push(p);
+      }
+    }
+  };
+  add(agentDocPaths);
+  for (const l of linkedSkills) add(l.skill.docPaths);
+  return out;
+}
+
 export interface ReviewDtoFinding extends Finding {
   review_id: string;
   accepted_at: string | null;

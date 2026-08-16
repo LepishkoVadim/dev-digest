@@ -48,6 +48,7 @@ export interface UpdateSkillInput {
   type?: SkillType;
   body?: string;
   enabled?: boolean;
+  doc_paths?: string[];
 }
 
 export class SkillsService {
@@ -59,12 +60,19 @@ export class SkillsService {
 
   async list(workspaceId: string): Promise<Skill[]> {
     const rows = await this.repo.list(workspaceId);
-    return rows.map(toSkillDto);
+    // "Used by N agents" per skill — one inArray count, then map in JS (AC-21).
+    const counts = await this.repo.usedByAgentsCounts(
+      workspaceId,
+      rows.map((r) => r.id),
+    );
+    return rows.map((r) => toSkillDto(r, counts.get(r.id) ?? 0));
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toSkillDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.usedByAgentsCounts(workspaceId, [id]);
+    return toSkillDto(row, counts.get(id) ?? 0);
   }
 
   /** Delete a skill (and its versions / agent links, via cascade). */
@@ -96,8 +104,11 @@ export class SkillsService {
       ...(patch.type !== undefined ? { type: patch.type } : {}),
       ...(patch.body !== undefined ? { body: patch.body } : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      ...(patch.doc_paths !== undefined ? { docPaths: patch.doc_paths } : {}),
     });
-    return row ? toSkillDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.usedByAgentsCounts(workspaceId, [id]);
+    return toSkillDto(row, counts.get(id) ?? 0);
   }
 
   /** Import a raw markdown body as an extracted, disabled skill. */

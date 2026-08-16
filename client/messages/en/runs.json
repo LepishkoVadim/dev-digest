@@ -34,6 +34,8 @@
       "memoryPulled": "Memory pulled",
       "specsRead": "Specs read",
       "items": "{count, plural, one {# item} other {# items}}",
+      "docTokens": "{count, plural, one {# tok} other {# tok}}",
+      "skipped": "skipped",
       "none": "none"
     },
     "stat": {

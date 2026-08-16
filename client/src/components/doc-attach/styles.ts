@@ -1,0 +1,60 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  wrap: { display: "flex", flexDirection: "column", gap: 12 } satisfies CSSProperties,
+  header: { display: "flex", alignItems: "center", gap: 12 } satisfies CSSProperties,
+  countPill: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  filter: { flex: 1, maxWidth: 260 } satisfies CSSProperties,
+  hint: { margin: 0, fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  list: { display: "flex", flexDirection: "column", gap: 4 } satisfies CSSProperties,
+  row: (attached: boolean, dragging: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 10px",
+    borderRadius: 8,
+    background: attached ? "var(--bg-hover)" : "transparent",
+    border: "1px solid var(--border)",
+    opacity: dragging ? 0.5 : 1,
+  }),
+  handle: (attached: boolean): CSSProperties => ({
+    cursor: attached ? "grab" : "default",
+    color: attached ? "var(--text-secondary)" : "var(--text-muted)",
+    display: "inline-flex",
+  }),
+  checkbox: (attached: boolean): CSSProperties => ({
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    border: `1.5px solid ${attached ? "var(--accent)" : "var(--border-strong, var(--border))"}`,
+    background: attached ? "var(--accent)" : "transparent",
+    color: "var(--accent-contrast, #fff)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    flexShrink: 0,
+  }),
+  name: { fontSize: 13, color: "var(--text-primary)" } satisfies CSSProperties,
+  prefix: { fontSize: 11, color: "var(--text-muted)" } satisfies CSSProperties,
+  tokens: { fontSize: 11, color: "var(--text-muted)", flexShrink: 0 } satisfies CSSProperties,
+  spacer: { flex: 1 } satisfies CSSProperties,
+
+  // Preview drawer (right slide-in).
+  drawerTitle: { display: "inline-flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
+  drawerMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 2,
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  drawerBody: { display: "flex", flexDirection: "column", gap: 16 } satisfies CSSProperties,
+  drawerCard: {
+    padding: "18px 20px",
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    background: "var(--bg-elevated, var(--bg-hover))",
+  } satisfies CSSProperties,
+} as const;

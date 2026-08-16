@@ -41,8 +41,21 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
                 <span style={s.specsNone}>{t("trace.config.none")}</span>
               ) : (
                 trace.specs_read.map((sp, i) => (
-                  <span key={i} className="mono" style={s.spec}>
-                    {sp}
+                  <span
+                    key={i}
+                    className="mono"
+                    style={sp.skipped ? s.specSkipped : s.spec}
+                    title={sp.path}
+                  >
+                    <span style={s.specPath}>{sp.path}</span>
+                    {sp.skipped ? (
+                      <span style={s.specBadge}>{t("trace.config.skipped")}</span>
+                    ) : (
+                      <span style={s.specTokens}>
+                        {" · "}
+                        {t("trace.config.docTokens", { count: sp.tokens })}
+                      </span>
+                    )}
                   </span>
                 ))
               )}

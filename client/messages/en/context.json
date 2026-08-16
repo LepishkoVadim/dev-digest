@@ -1,24 +1,52 @@
 {
   "title": "Project Context",
-  "chunks": "{count} chunks",
-  "reindex": "Re-index",
-  "indexing": "Indexing…",
-  "resync": "Resync",
-  "resyncing": "Resyncing…",
-  "indexStatus": "Index status: {status}",
-  "loadError": "Couldn’t load specs",
-  "kb": "{kb}kb",
+  "breadcrumb": "Project Context",
+  "listLabel": "PROJECT CONTEXT",
+  "preview": "Preview",
+  "subtitle": "Markdown docs found in this repo — attach them to agents and skills as grounding.",
+  "rescan": "Rescan",
+  "rescanning": "Rescanning…",
+  "footer": "{count, plural, one {# file} other {# files}} · last scanned {when}",
+  "usedByAgents": "Used by {count, plural, one {# agent} other {# agents}}",
+  "docTokens": "{count, plural, one {# token} other {# tokens}}",
+  "selectPrompt": "Select a doc to preview it.",
+  "loading": "Scanning repo for docs…",
+  "loadError": {
+    "title": "Couldn’t scan this repo",
+    "body": "The doc scan failed. The repo may not be cloned yet, or the walk errored."
+  },
   "empty": {
-    "title": "No spec files yet",
-    "body": "Drop your PRDs, tech specs, and acceptance criteria under .devdigest/specs/. Every agent and the PR brief read them as grounding context."
+    "title": "No .md docs found",
+    "body": "No .md docs under specs/, docs/, or insights/ in this repo. Docs are files in the repo — add them there, then rescan."
   },
-  "mode": {
-    "preview": "preview",
-    "edit": "edit"
+  "noRepo": {
+    "title": "No repo selected",
+    "body": "Pick a repo from the switcher to browse its project context."
   },
-  "editor": {
-    "loadError": "Couldn’t load spec",
-    "save": "Save",
-    "saving": "Saving…"
+  "type": {
+    "specs": "specs",
+    "docs": "docs",
+    "insights": "insights",
+    "readme": "readme"
+  },
+  "attach": {
+    "title": "Project Context",
+    "subtitle": "Attach repo docs as grounding. Order is load-bearing — drag to reorder.",
+    "attachedCount": "{attached} of {total} attached",
+    "filterPlaceholder": "Filter docs…",
+    "noMatches": "No docs match your filter.",
+    "empty": {
+      "title": "No .md docs found",
+      "body": "No .md docs under specs/, docs/, or insights/ in this repo."
+    },
+    "noRepo": "Pick a repo from the switcher to attach its docs.",
+    "preview": "Preview",
+    "attach": "Attach",
+    "attached": "Attached",
+    "tokenTotal": "{count, plural, one {# token} other {# tokens}} attached",
+    "injectionCaption": "Injected as an untrusted block (## Project context) into every run.",
+    "serializesAs": "SERIALIZES AS",
+    "serializesHint": "Edit-time preview of this skill’s attached docs (paths only).",
+    "usedByAgents": "Used by {count, plural, one {# agent} other {# agents}}"
   }
 }
