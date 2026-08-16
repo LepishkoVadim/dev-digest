@@ -13,3 +13,8 @@ extracted yet:
 Add a prose spec here only when a behavior isn't pinned by the schemas or tests —
 e.g. an error-envelope expectation, a rate-limit contract, or a cross-endpoint
 invariant — rather than restating the zod schemas.
+
+Naming, status lifecycle, the section template and the EARS patterns live in
+[`../../specs/README.md`](../../specs/README.md) — a spec that touches `server`
+alone belongs here; one that spans two or more modules goes to the top-level
+`specs/` instead.

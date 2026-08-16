@@ -14,3 +14,8 @@ Behavior contracts for the engine. Coverage today is the hermetic vitest suite
 Add a prose spec here only for a higher-level invariant the tests don't state
 plainly — e.g. a grounding invariant or an injection-guard case matrix — rather
 than restating the tests.
+
+Naming, status lifecycle, the section template and the EARS patterns live in
+[`../../specs/README.md`](../../specs/README.md) — a spec that touches `reviewer-core`
+alone belongs here; one that spans two or more modules goes to the top-level
+`specs/` instead.

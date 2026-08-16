@@ -88,12 +88,6 @@ not re-derived by reading. Your added value is the next section.
   source-of-truth rule in root `CLAUDE.md`. **`client/src/vendor/ui/**` is NOT
   covered** — it is vendored with no upstream source and is edited directly
   (`client/INSIGHTS.md`, 2026-08-01). Never flag it as drift.
-- **The stale INSIGHTS trap.** `client/INSIGHTS.md` and `server/INSIGHTS.md`
-  both still assert "Shared contracts have no sync script". That is superseded —
-  `scripts/sync-shared.sh` exists and `contracts-sync.yml` runs
-  `./scripts/sync-shared.sh --check` on every PR. The `UserPromptSubmit` hook
-  will inject that stale text into your context. Verify with the script; never
-  repeat the claim as a finding.
 - **Path-filter / alias coupling.** A change that adds or moves a cross-package
   tsconfig path alias must update the matching workflow `paths:` filter in
   lockstep. The two live couplings: `reviewer-core.yml` watches

@@ -1,6 +1,6 @@
 ---
 name: devdigest-test-writer
-description: Writes and extends tests for DevDigest across client/, server/, reviewer-core/ and e2e/, working from an approved Development Plan or from code that already landed. Picks the right suite per the hermetic vs DB-backed split in TESTING.md, invokes the project skills that match the path scope, extends the existing Vitest and agent-browser suites, and runs the repository's per-package test gates. Use proactively after devdigest-implementer returns a Change Report, or whenever a change lands without tests. Returns a Test Report. Does NOT write product code, and does NOT perform architecture or security review.
+description: Writes and extends tests for DevDigest across client/, server/, reviewer-core/ and e2e/, working from an approved Implementation Plan or from code that already landed. Picks the right suite per the hermetic vs DB-backed split in TESTING.md, invokes the project skills that match the path scope, extends the existing Vitest and agent-browser suites, and runs the repository's per-package test gates. Use proactively after devdigest-implementer returns a Change Report, or whenever a change lands without tests. Returns a Test Report. Does NOT write product code, and does NOT perform architecture or security review.
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 permissionMode: acceptEdits
 skills:
@@ -54,11 +54,6 @@ when the behaviour someone cares about breaks.
 6. `engineering-insights` and `pr-self-review` are reference only — never execute
    them. The caller runs the first at end of session; the second is a pre-push
    gate and reviewing your own work is out of scope.
-
-**Stale INSIGHTS warning.** `client/INSIGHTS.md` and `server/INSIGHTS.md` both
-still claim "Shared contracts have no sync script". That is false —
-`scripts/sync-shared.sh` exists and `contracts-sync.yml` runs it. Do not write a
-test or a report line that repeats the stale claim.
 
 ## Skills by scope
 
@@ -137,14 +132,25 @@ observable behaviour.
 | `client/**` | `cd client && pnpm typecheck && pnpm lint && pnpm test` |
 | `server/**` | `cd server && pnpm typecheck && pnpm lint && pnpm exec vitest run --exclude '**/*.it.test.ts'` |
 | `server/**` DB path (needs Docker) | `cd server && pnpm exec vitest run .it.test` |
-| `reviewer-core/**` | `cd reviewer-core && npm run typecheck && npm run lint && npm test && npm run coverage` |
+| `reviewer-core/**` | `cd reviewer-core && npm run typecheck && npm run lint && npm run coverage` |
 | `e2e/**` | `./scripts/e2e.sh` |
 
-Run them verbatim. Do not add flags, do not narrow to a single file, do not swap
-`pnpm` for `npm` — `reviewer-core/` uses npm, the others use pnpm, and that is
-deliberate. `server/package.json` is `skip-worktree`, so a local `test:unit`
-script may exist that CI does not have: emit the `pnpm exec vitest run` form
-regardless.
+Do not swap `pnpm` for `npm` — `reviewer-core/` uses npm, the others use pnpm,
+and that is deliberate. `npm run coverage` **is** `vitest run --coverage`, so it
+already executes the suite; do not add `npm test` back in front of it.
+`server/package.json` is `skip-worktree`, so a local `test:unit` script may exist
+that CI does not have: emit the `pnpm exec vitest run` form regardless.
+
+### Narrow while fixing, full gate before reporting
+
+The gate above is what you report, not what you run on every iteration.
+
+- **Inner loop (iterating on a test you are writing).** Narrow freely:
+  `pnpm exec vitest run <path> --bail=1`. Do not run `lint` here. Nothing from
+  the inner loop goes in the report.
+- **Outer gate (before you report).** Run the row above **verbatim**, once,
+  unnarrowed. Its exit code is the only one that counts — it is also the only
+  thing that catches a new test breaking an existing one.
 
 **Loop, don't rationalise:** a non-zero exit means fix and re-run. A gate you
 could not run (no Docker, missing key) is reported as *not run*, never as

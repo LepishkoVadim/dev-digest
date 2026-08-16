@@ -6,7 +6,10 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 
 | Skill | Scope | Description |
 |-------|-------|-------------|
+| [run-plan](run-plan/SKILL.md) | Orchestration | Executes an approved Implementation Plan: implementer → architecture review → bounded fix rounds → conditional plan verification. Spec-creator, planner, test-writer and doc-writer stay manual |
 | [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR gate: dispatches lens skills over the diff by scope + deterministic checks (secret/arch/contract); blocks the PR on any critical finding |
+| [engineering-insights](engineering-insights/SKILL.md) | Shared | Per-module `INSIGHTS.md`: read at task start, append substantial non-duplicate gotchas at the end. Append-only |
+| [frontend-ui-architecture](frontend-ui-architecture/SKILL.md) | Frontend | Where a UI file goes and why: component location, constants/utils/lib/services, type placement |
 | [onion-architecture](onion-architecture/SKILL.md) | Backend | Layer boundaries, inward-only dependency rule, file placement; enforced via dependency-cruiser (`pnpm arch:check`) |
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |

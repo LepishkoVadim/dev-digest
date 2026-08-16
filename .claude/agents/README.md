@@ -9,16 +9,18 @@ the **map** — the rules live in each agent's own markdown body.
 | Agent | Role | Writes files? | Model |
 |-------|------|---------------|-------|
 | [researcher](researcher.md) | Finds where something is implemented and how it works; external docs research | No | `sonnet` |
-| [devdigest-planner](devdigest-planner.md) | Turns a task into a Development Plan before any code is written | No | inherit |
+| [devdigest-spec-creator](devdigest-spec-creator.md) | Turns a feature idea plus its designs into a written spec: EARS acceptance criteria, edge cases, design review, cross-module contracts | Yes (`specs/` + `<module>/specs/` only) | inherit |
+| [devdigest-implementation-planner](devdigest-implementation-planner.md) | Audits the stated requirements, then turns them into an Implementation Plan before any code is written. Writes no specs | No | inherit |
 | [devdigest-implementer](devdigest-implementer.md) | Executes an approved plan across the packages, runs the repo's gates | Yes | inherit |
 | [devdigest-test-writer](devdigest-test-writer.md) | Writes/extends tests per package from a plan or from code that landed | Yes (tests only) | `sonnet` |
 | [devdigest-architecture-reviewer](devdigest-architecture-reviewer.md) | Read-only boundary review: Onion, `reviewer-core/` purity, contract drift, CI coupling | No | `sonnet` |
 | [devdigest-plan-verifier](devdigest-plan-verifier.md) | Read-only plan↔code correspondence audit, one row per plan item | No | `sonnet` |
-| [devdigest-doc-writer](devdigest-doc-writer.md) | Turns implemented work into routed docs with Mermaid diagrams | Yes (markdown only) | `sonnet` |
+| [devdigest-doc-writer](devdigest-doc-writer.md) | Turns implemented work into routed docs with Mermaid diagrams; closes a spec's `Status` | Yes (markdown only) | `sonnet` |
 
-**Model tiering (why).** `planner` and `implementer` stay on `inherit` (the
-session's Opus) — open-ended design and cross-package edits are where the strong
-model earns its cost. The other four run on `sonnet`: they execute against an
+**Model tiering (why).** `spec-creator`, `implementation-planner` and `implementer`
+stay on `inherit` (the session's Opus) — open-ended design, reading a mockup for
+what it *omits*, and cross-package edits are where the strong model earns its
+cost. The other four run on `sonnet`: they execute against an
 *explicit spec* the strong model already produced — a plan to audit, a rule file
 to check against, tests to write from a plan, docs from settled code. Their
 verdict is anchored to something falsifiable (`arch:check` output, a `file:line`
@@ -29,14 +31,25 @@ on `sonnet` ever misses a boundary smell the gates cannot catch, flip that one
 back to `inherit` — it is the most judgment-heavy of the four.
 
 **Security review is not in this set.** Architecture review is
-(`devdigest-architecture-reviewer`); security remains an open gap, and planner,
+(`devdigest-architecture-reviewer`); security remains an open gap, and implementation-planner,
 implementer and test-writer are all configured so they cannot review their own
 work.
 
 ## Pipeline
 
 ```
-task ──▶ devdigest-planner ──▶ Development Plan ──▶ [you approve]
+idea + designs ─▶ devdigest-spec-creator (phase 1) ──▶ blocking questions
+                                      │                + RESUME BRIEF
+                              [you answer them]
+                                      ▼
+                  devdigest-spec-creator (phase 2) ──▶ specs/YYYY-MM-DD-*.md
+                                      │            (or <module>/specs/ if 1 module)
+                                      │
+                                      ▼
+requirements ──▶ devdigest-implementation-planner ──▶ Implementation Plan
+                                      │          (§1 requirements review · §10 mode)
+                                      ▼
+              [you answer §10: multi-agent pipeline or single pass]
                                       │
                                       ▼
                           devdigest-implementer ──▶ Change Report
@@ -55,7 +68,24 @@ task ──▶ devdigest-planner ──▶ Development Plan ──▶ [you appro
                    ./scripts/pr-self-review.sh (PreToolUse hook on push)
 ```
 
-- `devdigest-test-writer` takes **either** a Development Plan (tests for planned
+- `devdigest-spec-creator` is **two calls, not one** — a subagent cannot hold a
+  conversation, so the first call reads and interrogates without writing, and the
+  second writes once you have answered. Its `RESUME BRIEF` is the handoff between
+  the two: phase 2 starts from an empty context and sees only what that block
+  carries. Paste it back verbatim with your answers appended.
+- The spec feeds the planner, it does not replace it: the spec says *what and
+  why*, the plan says *which files, which layer, which order*. Skip the spec for
+  a change whose behaviour is already pinned by the Zod contracts and the tests.
+- **`AC-n` is the thread that runs through the whole pipeline.** The spec numbers
+  its acceptance criteria; the planner must make every one reachable from a step's
+  *done when*; `plan-verifier` reports one row per `AC-n`, extracted from the spec
+  file rather than from the plan's citations of it. A criterion nothing cites is a
+  criterion nothing checks.
+- **The spec's `Status:` is closed by `doc-writer`**, which runs last on settled
+  code and may touch exactly three header lines (`Status`, `Plan`, `PR`). A human
+  sets `approved`; no agent does. A spec with an unresolved `blocker` row in its
+  *Design review* cannot reach `approved` at all.
+- `devdigest-test-writer` takes **either** an Implementation Plan (tests for planned
   work) **or** a Change Report plus the diff (backfill for what landed). It
   writes files, so it runs before the read-only reviewers — its tests become
   part of the diff they audit.
@@ -112,8 +142,9 @@ model, or a tool the current agent lacks — not because it is "a separate conce
 | Agent | Reads | Returns |
 |-------|-------|---------|
 | `researcher` | repo (Glob → Grep → Read → `git log`), or external docs | Report: Question / Conclusion / Evidence / Not found / Uncertainties |
-| `devdigest-planner` | root + module `CLAUDE.md`, **every touched `INSIGHTS.md`**, `TESTING.md`, `docs/ARCHITECTURE.md`, `.dependency-cruiser.cjs` | **Development Plan**, §1–§8: scope · modules · constraints · **§4 skills per scope** · ordered steps with *done when* · contract/DB impact · verbatim verification commands · risks |
-| `devdigest-implementer` | the Development Plan, module `CLAUDE.md` + `INSIGHTS.md` | **Change Report**: plan compliance · commands run with exit codes · deviations · **not verified here** · insight candidates |
+| `devdigest-spec-creator` | the feature brief, the designs (screenshots · design docs · `client/src`), root + module `CLAUDE.md` + `INSIGHTS.md`, adjacent code, `specs/README.md` + existing specs | **Phase 1**: understanding · `BLOCKING` questions with best guesses · `NON-BLOCKING` proposals with defaults · preliminary design review · **`RESUME BRIEF`**. **Phase 2**: `<specs dir>/YYYY-MM-DD-<slug>.md` + report (decisions taken · still open · blocker rows · **investigated** · **self-check** · insight candidates). Dispatches `researcher` in parallel for anything findable; runs an 11-item self-check over the file before reporting |
+| `devdigest-implementation-planner` | the stated requirements, root + module `CLAUDE.md`, **every touched `INSIGHTS.md`**, `TESTING.md`, `docs/ARCHITECTURE.md`, `.dependency-cruiser.cjs` | **Implementation Plan**, §1–§10: **§1 requirements review** (clear/ambiguous/conflicting/missing/already satisfied · blocking questions · assumptions · recommendations) · scope · modules · constraints · **§5 skills per scope** · ordered steps with *done when* · contract/DB impact · verbatim verification commands · risks · **§10 execution-mode question** |
+| `devdigest-implementer` | the Implementation Plan, module `CLAUDE.md` + `INSIGHTS.md` | **Change Report**: plan compliance · commands run with exit codes · deviations · **not verified here** · insight candidates |
 | `devdigest-test-writer` | the plan or Change Report, `TESTING.md`, module `CLAUDE.md` + `INSIGHTS.md`, the code under test | **Test Report**: tests added/changed with the regression each catches · commands run with exit codes · coverage of the plan · not verified here · insight candidates |
 | `devdigest-architecture-reviewer` | the diff, `server/.dependency-cruiser.cjs`, `onion-architecture`, module `CLAUDE.md`, the workflows | **Architecture Review**: verdict · gates run · findings as *where / code / rule violated / rule defined in* · **checked and clean** · not checked here |
 | `devdigest-plan-verifier` | the plan text (pasted by you) plus a diff, commit range or working tree | **Plan Verification**: one row per plan item → `DONE / PARTIAL / MISSING / DEVIATED / UNVERIFIABLE` + `path:line` evidence · contract/DB impact · §7 commands · files changed but not planned |
@@ -126,12 +157,12 @@ step, they are told to say so plainly rather than route around it via `bash`.
 
 ## Permissions
 
-| | `researcher` | `planner` | `implementer` | `test-writer` | `architecture-reviewer` | `plan-verifier` | `doc-writer` |
-|---|---|---|---|---|---|---|---|
-| `tools` | `Read, Glob, Grep, Bash, WebSearch, WebFetch` | `Read, Glob, Grep, Bash, WebFetch, Skill` | *(omitted — inherits)* | `Read, Write, Edit, Glob, Grep, Bash, Skill` | `Read, Glob, Grep, Bash, Skill` | `Read, Glob, Grep, Bash, Skill` | `Read, Write, Edit, Glob, Grep, Bash, Skill` |
-| `disallowedTools` | — | — | `Agent` | — | `Edit, Write, NotebookEdit, Agent` | `Edit, Write, NotebookEdit, Agent` | — |
-| `permissionMode` | — | — | `acceptEdits` | `acceptEdits` | — | — | `acceptEdits` |
-| `skills` (preloaded) | — | all 14 | all 14 | 10 (testing + scope) | 4 | **0** | 3 |
+| | `researcher` | `spec-creator` | `planner` | `implementer` | `test-writer` | `architecture-reviewer` | `plan-verifier` | `doc-writer` |
+|---|---|---|---|---|---|---|---|---|
+| `tools` | `Read, Glob, Grep, Bash, WebSearch, WebFetch` | `Read, Write, Edit, Glob, Grep, Bash, Skill, **Agent**` | `Read, Glob, Grep, Bash, WebFetch, Skill` | *(omitted — inherits)* | `Read, Write, Edit, Glob, Grep, Bash, Skill` | `Read, Glob, Grep, Bash, Skill` | `Read, Glob, Grep, Bash, Skill` | `Read, Write, Edit, Glob, Grep, Bash, Skill` |
+| `disallowedTools` | — | — | — | `Agent` | — | `Edit, Write, NotebookEdit, Agent` | `Edit, Write, NotebookEdit, Agent` | — |
+| `permissionMode` | — | `acceptEdits` | — | `acceptEdits` | `acceptEdits` | — | — | `acceptEdits` |
+| `skills` (preloaded) | — | 2 (`mermaid-diagram`, `security`) | all 14 | all 14 | 10 (testing + scope) | 4 | **0** | 3 |
 
 **Why the four new agents preload a subset.** `skills:` costs ~32k tokens per
 invocation for the full 14 and does **not** gate access — any agent with the
@@ -144,13 +175,27 @@ to that agent's `skills:` rather than to all of them.
 Notes that matter in practice:
 
 - **Read-only is discipline, not a sandbox.** Both `researcher` and
-  `devdigest-planner` keep `Bash` (for `git log`, `rg`, `head`), and `bash` can
+  `devdigest-implementation-planner` keep `Bash` (for `git log`, `rg`, `head`), and `bash` can
   write. Each body forbids `>`, `>>`, `tee`, `sed -i`, `patch` explicitly. If you
   need a hard guarantee, drop `Bash` or add a deny rule in `settings.json`.
+- **`spec-creator`'s confinement to `specs/` + `<module>/specs/` is prose, not a
+  sandbox.**
+  Claude Code has no per-agent path scoping — `permissions:` in agent frontmatter
+  does nothing (see *Adding an agent*), and a `deny` rule in `settings.json`
+  applies to your main session too. The body forbids every other path and the
+  shell redirect operators explicitly. If you want it enforced, that is a
+  `PreToolUse` hook matching `Write|Edit` on the agent, not a frontmatter field.
 - **A permissive parent overrides a restrictive child.** If your main session runs
   `bypassPermissions` or `acceptEdits`, a subagent's `permissionMode` is ignored.
 - **No `Agent` tool** on planner or implementer — neither can spawn subagents, so
   review stays with the dedicated agents.
+- **`spec-creator` is the one exception**, and deliberately so. It works at the
+  point where the unknowns are still facts, not code: what a route actually
+  returns, what a library limits, what the current UI already does. Every such
+  unknown it hands back as a `BLOCKING` question is an afternoon of someone else's
+  lookup, so it dispatches `researcher` subagents — in parallel, capped at four per
+  phase — and reserves `BLOCKING` for decisions only. Nesting is one level: the
+  researchers it spawns are read-only and spawn nothing.
 - **`skills:` preloads full text (~32k tokens per invocation), it does not gate
   access.** Any agent with the `Skill` tool can still invoke unlisted skills. A
   skill added to `.claude/skills/` after these files were written is *not*
@@ -166,7 +211,7 @@ Verified against the live docs, not recalled. Two pages:
 | Rule | Source | Where it landed |
 |------|--------|-----------------|
 | Only `name` + `description` required; `description` states *when to delegate* | S1 | Both frontmatters; descriptions are trigger conditions, not job titles |
-| "include phrases like **use proactively**" to encourage delegation | S1 | Planner `description` |
+| "include phrases like **use proactively**" to encourage delegation | S1 | Implementation-planner `description` |
 | `tools` is an allowlist; `disallowedTools` a denylist subtracted from the inherited pool | S1 | Planner allowlist · implementer `disallowedTools: Agent` |
 | "omit `Agent` … to keep one subagent from spawning" | S1 | Both — review stays external |
 | `model` defaults to `inherit` | S1 | Field omitted on both, deliberately |
@@ -221,8 +266,23 @@ do nothing here; use `tools` / `disallowedTools` / `permissionMode`.
 
 Invoke explicitly with `@agent-<name>`.
 
+**Plan sections are addressed by heading, not by number** (changed 2026-08-16).
+`devdigest-implementer` and `devdigest-plan-verifier` write every cross-file
+reference as `§N (Heading)` and are told the heading is authoritative and the
+number is a stale-able hint; a mismatch is reported (Deviations / Out-of-plan
+observations) rather than silently followed. Previously both addressed the plan
+by bare number, so inserting or reordering a section in the planner's template
+made them silently retarget — the implementer would read §5 as *Steps* instead
+of *Skills* and skip the skill pass with no error anywhere.
+
+What this means when you edit the template: **renumbering is now safe, renaming
+is not.** The planner is told to reproduce all ten headings verbatim. Change a
+heading's wording and you must grep `§` across this directory in the same
+commit; change only its number and you need not.
+
 ---
 
-**Known drift:** [`../skills/README.md`](../skills/README.md) lists 12 skills; the
-directory holds 14 (`engineering-insights` and `frontend-ui-architecture` are
-missing from that catalog).
+**Running the execution half:** the [`run-plan`](../skills/run-plan/SKILL.md)
+skill orchestrates implementer → architecture-reviewer → bounded fix rounds →
+conditional plan-verifier from an approved plan. `spec-creator`,
+`implementation-planner`, `test-writer` and `doc-writer` stay manual by design.

@@ -59,6 +59,9 @@ Per-package suites (`client` · `server-unit` · `server-integration` ·
 - Read `docs/ARCHITECTURE.md` when you need the full end-to-end review flow.
 - Read `TESTING.md` when running or adding tests (per-package suites, hermetic vs
   DB-backed split).
+- Read `specs/README.md` before writing or reading an SDD spec — it holds the
+  scope→location routing (single-module specs live in `<module>/specs/`), the
+  `YYYY-MM-DD-<feature>.md` naming, the status lifecycle and the EARS patterns.
 - Read `docs/agent-prompts/` when working on reviewer system prompts or model choice.
 - Read `<module>/CLAUDE.md` **before editing any file inside that module** — it
   maps the module and links its README / docs / specs / INSIGHTS.

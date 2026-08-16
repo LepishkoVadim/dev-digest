@@ -12,3 +12,8 @@ prose specs are extracted yet:
 Add a UI-only spec here only when a behavior needs a contract neither layer pins —
 a cross-page interaction rule, a loading/error-state contract, or an accessibility
 invariant — rather than duplicating an e2e flow.
+
+Naming, status lifecycle, the section template and the EARS patterns live in
+[`../../specs/README.md`](../../specs/README.md) — a spec that touches `client`
+alone belongs here; one that spans two or more modules goes to the top-level
+`specs/` instead.
