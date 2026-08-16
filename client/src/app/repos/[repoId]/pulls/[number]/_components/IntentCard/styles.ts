@@ -79,6 +79,11 @@ export const s = {
     fontSize: 12,
     color: "var(--text-secondary)",
   } satisfies CSSProperties,
+  riskAreas: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTop: "1px solid var(--border)",
+  } satisfies CSSProperties,
 } as const;
 
 /** Confidence → badge colour. Low is a warning: context was missing. */

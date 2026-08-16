@@ -1,4 +1,4 @@
-import type { Finding, UnifiedDiff } from '@devdigest/shared';
+import type { BriefRisk, Finding, ReviewFocus, UnifiedDiff } from '@devdigest/shared';
 
 /**
  * Citation grounding — the mandatory mechanical gate for diff-findings.
@@ -91,4 +91,70 @@ export function groundFindings(findings: Finding[], diff: UnifiedDiff): Groundin
 export function groundingSummary(result: GroundingResult): string {
   const total = result.kept.length + result.dropped.length;
   return `${result.kept.length}/${total} passed`;
+}
+
+// ---------------------------------------------------------------------------
+// Brief-reference grounding — the same "model proposes, code disposes" gate as
+// `groundFindings`, but for the PR Brief. The Brief carries bare file PATHS
+// (not line-ranged findings) and "METHOD /path" ENDPOINT refs, so it grounds
+// against two sets: the diff's changed files, and the blast report's impacted
+// endpoints. Anything the model invented — a path not in the diff, an endpoint
+// not in the blast report — is dropped. PURE: no logging (the caller logs each
+// `dropped` entry per NFR-4) and NO `risk_level` derivation (the caller does).
+// ---------------------------------------------------------------------------
+
+/** What the model returns, ungrounded — the parts this gate filters. */
+export interface BriefCandidateRefs {
+  risks: BriefRisk[];
+  review_focus: ReviewFocus[];
+}
+
+export interface BriefGroundingResult {
+  risks: BriefRisk[];
+  review_focus: ReviewFocus[];
+  /** One entry per dropped reference; the caller emits a log line each. */
+  dropped: { ref: string; reason: string }[];
+}
+
+/**
+ * Ground a Brief candidate's references.
+ *   - `risks[].file_refs`  : keep only paths in `changedFiles`.
+ *   - `risks[].endpoint_refs` : keep only endpoints in `endpoints`; when
+ *     `endpoints` is empty (blast degraded/empty — AC-18), ALL endpoint refs
+ *     are dropped.
+ *   - `review_focus[].file`: keep the item only if its file is in `changedFiles`.
+ *
+ * A risk whose refs are all dropped is still KEPT (the risk narrative may still
+ * be valid) but with empty ref arrays; only the ungrounded refs are removed.
+ * `review_focus` items are DROPPED entirely when their file is ungrounded —
+ * a "read this first" link that points nowhere is worse than nothing.
+ */
+export function groundBriefRefs(
+  candidate: BriefCandidateRefs,
+  input: { changedFiles: Set<string>; endpoints: Set<string> },
+): BriefGroundingResult {
+  const { changedFiles, endpoints } = input;
+  const dropped: { ref: string; reason: string }[] = [];
+
+  const risks: BriefRisk[] = candidate.risks.map((risk) => {
+    const fileRefs = risk.file_refs.filter((f) => {
+      if (changedFiles.has(f)) return true;
+      dropped.push({ ref: f, reason: `file '${f}' not present in diff changed files` });
+      return false;
+    });
+    const endpointRefs = (risk.endpoint_refs ?? []).filter((e) => {
+      if (endpoints.has(e)) return true;
+      dropped.push({ ref: e, reason: `endpoint '${e}' not present in blast impacted_endpoints` });
+      return false;
+    });
+    return { ...risk, file_refs: fileRefs, endpoint_refs: endpointRefs };
+  });
+
+  const review_focus: ReviewFocus[] = candidate.review_focus.filter((focus) => {
+    if (changedFiles.has(focus.file)) return true;
+    dropped.push({ ref: focus.file, reason: `review_focus file '${focus.file}' not present in diff changed files` });
+    return false;
+  });
+
+  return { risks, review_focus, dropped };
 }

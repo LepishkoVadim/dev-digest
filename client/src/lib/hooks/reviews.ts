@@ -8,6 +8,7 @@ import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
   FindingActionKind,
+  PrBriefRecord,
   PrIntentRecord,
   PrReviewComment,
   ReviewRecord,
@@ -159,6 +160,27 @@ export function useDeriveIntent(prId: string | null | undefined) {
   return useMutation({
     mutationFn: () => api.post<PrIntentRecord>(`/pulls/${prId}/intent`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pr-intent", prId] }),
+  });
+}
+
+// ---- PR Brief (the "what / why / where it hurts" Overview card) ----
+/** The persisted Brief for a PR. A 404 (never derived) is an EXPECTED state, so
+    `retry: false` — the card renders its empty state instead of retrying. */
+export function useBrief(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pr-brief", prId],
+    queryFn: () => api.get<PrBriefRecord>(`/pulls/${prId}/brief`),
+    enabled: !!prId,
+    retry: false,
+  });
+}
+
+/** (Re-)derive the Brief for a PR; refreshes the query on success. */
+export function useDeriveBrief(prId: string | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<PrBriefRecord>(`/pulls/${prId}/brief`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pr-brief", prId] }),
   });
 }
 

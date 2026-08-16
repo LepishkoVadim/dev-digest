@@ -1,12 +1,18 @@
 import type { Container } from '../../platform/container.js';
 import type {
+  Brief,
+  BriefRisk,
   FindingActionKind,
   Intent,
   IntentSource,
+  PrBriefRecord,
+  RiskSeverity,
   RunEventKind,
   RunTrace,
   UnifiedDiff,
 } from '@devdigest/shared';
+import { LlmBriefCandidate } from '@devdigest/shared';
+import { groundBriefRefs } from '@devdigest/reviewer-core';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { RunLogger } from '../../platform/run-logger.js';
@@ -21,11 +27,27 @@ import { loadDiff } from './diff-loader.js';
 import {
   LINKED_ISSUE_PATTERN,
   IntentResult,
+  buildBriefMessages,
   buildIntentMessages,
   deriveConfidence,
   extractDocRefs,
   hunkHeaderDigest,
+  renderIntentBlock,
 } from './intent.js';
+
+/**
+ * Overall Brief risk = the MAX severity across its risks (AC-4). Derived in
+ * CODE from the grounded risks, never trusted from the model. `low` when there
+ * are no risks (an empty brief is not "high risk").
+ */
+const SEVERITY_RANK: Record<RiskSeverity, number> = { low: 0, medium: 1, high: 2 };
+export function riskLevelFrom(risks: BriefRisk[]): RiskSeverity {
+  let level: RiskSeverity = 'low';
+  for (const r of risks) {
+    if (SEVERITY_RANK[r.severity] > SEVERITY_RANK[level]) level = r.severity;
+  }
+  return level;
+}
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -315,6 +337,190 @@ export class ReviewService {
     );
 
     return (await this.repo.getIntent(prId)) ?? { ...derived, derived_at: null };
+  }
+
+  // ===========================================================================
+  // PR Brief — the "what / why / where it hurts" one-glance card
+  // ===========================================================================
+
+  /** The persisted Brief for a PR, or undefined when it has never been derived. */
+  async getBrief(workspaceId: string, prId: string): Promise<PrBriefRecord | undefined> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    return this.repo.getBrief(prId);
+  }
+
+  /**
+   * Derive (or re-derive) a PR's Brief with the `risk_brief` model and persist
+   * it keyed by the current head SHA. Same "model proposes, code disposes"
+   * shape as `deriveIntent`: gather METADATA-ONLY sources (never a diff body —
+   * NFR-1) → resolveFeatureModel → completeStructured → **code-side gate**
+   * (ground refs against the diff/blast, derive risk_level = max severity) →
+   * persist. On LLM failure, `completeStructured` throws and NOTHING is
+   * persisted (AC-8).
+   */
+  async deriveBrief(
+    workspaceId: string,
+    prId: string,
+    opts: { diff?: UnifiedDiff; log?: RunLogger } = {},
+  ): Promise<PrBriefRecord> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repo = await this.repo.getRepo(pull.repoId);
+    if (!repo) throw new NotFoundError('Repo not found');
+    const log = opts.log;
+
+    // ---- 1. Gather sources (pure code); each fetch marks a source status.
+    const sources: IntentSource[] = [{ kind: 'pr_title', ref: `#${pull.number}`, status: 'used' }];
+    const body = pull.body ?? '';
+    const hasBody = body.trim().length > 0;
+    sources.push({ kind: 'pr_body', ref: `#${pull.number}`, status: hasBody ? 'used' : 'empty' });
+
+    const ref = { owner: repo.owner, name: repo.name };
+
+    // Persisted intent (may be absent — the Brief still derives without it).
+    const intent = await this.repo.getIntent(prId);
+    const intentBlock = intent ? renderIntentBlock(intent) : undefined;
+
+    // Linked issue — same regex the octokit adapter + intent classifier use.
+    let linkedIssue: { ref: string; text: string } | undefined;
+    const issueMatch = body.match(LINKED_ISSUE_PATTERN);
+    if (issueMatch?.[1]) {
+      const issueRef = `#${issueMatch[1]}`;
+      try {
+        const gh = await this.container.github();
+        const issue = await gh.getIssue(ref, Number(issueMatch[1]));
+        linkedIssue = { ref: issueRef, text: `${issue.title}\n\n${issue.body ?? ''}` };
+        sources.push({ kind: 'linked_issue', ref: issueRef, status: 'used' });
+      } catch {
+        sources.push({ kind: 'linked_issue', ref: issueRef, status: 'unavailable' });
+      }
+    }
+
+    // Plan/spec docs — repo-relative paths read through git (no HTTP fetcher).
+    const planDocs: { ref: string; text: string }[] = [];
+    for (const cand of extractDocRefs(body)) {
+      if (cand.status === 'unavailable') {
+        sources.push(cand);
+        continue;
+      }
+      const content = await readFileSafe(this.container.git, ref, cand.ref);
+      if (content == null) {
+        sources.push({ ...cand, status: 'unavailable' });
+      } else {
+        planDocs.push({ ref: cand.ref, text: content });
+        sources.push(cand);
+      }
+    }
+
+    // Changed files + hunk POSITIONS (never a diff body). Reuse a passed diff.
+    let fileDigest = '';
+    let changedFiles = new Set<string>();
+    try {
+      const diff =
+        opts.diff ?? (await loadDiff(this.container, this.repo, workspaceId, pull, repo));
+      fileDigest = hunkHeaderDigest(diff);
+      changedFiles = new Set(diff.files.map((f) => f.path));
+      sources.push({
+        kind: 'file_list',
+        ref: `${diff.files.length} file(s)`,
+        status: diff.files.length > 0 ? 'used' : 'empty',
+      });
+    } catch {
+      sources.push({ kind: 'file_list', ref: 'diff', status: 'unavailable' });
+    }
+
+    // ---- 2. Deterministic blast summary + impacted-endpoint set. Read via the
+    //         RepoIntel FACADE (never the blast module — that would add a new
+    //         cross-module arch edge). Degraded/empty blast is fine (AC-18):
+    //         we omit endpoint refs and keep review_focus to changed files.
+    const endpoints = new Set<string>();
+    let blastSummary = '';
+    try {
+      const changedList = [...changedFiles];
+      const blast = await this.container.repoIntel.getBlastRadius(pull.repoId, changedList);
+      const impacted = await this.container.repoIntel.getImpactedEndpoints(pull.repoId, changedList);
+      for (const e of blast.impactedEndpoints) endpoints.add(e);
+      for (const e of impacted.endpoints) endpoints.add(e.endpoint);
+      const lines: string[] = [];
+      if (blast.changedSymbols.length > 0) {
+        lines.push(
+          `Changed symbols: ${blast.changedSymbols
+            .slice(0, 40)
+            .map((s) => `${s.name} (${s.file})`)
+            .join(', ')}`,
+        );
+      }
+      if (endpoints.size > 0) lines.push(`Impacted endpoints: ${[...endpoints].sort().join(', ')}`);
+      if (blast.degraded) lines.push('(blast index degraded — endpoint impact may be incomplete)');
+      blastSummary = lines.join('\n');
+    } catch {
+      // A blast failure never blocks the Brief; endpoints stay empty (AC-18).
+    }
+
+    log?.info(
+      `brief: sources — ${sources.map((s) => `${s.kind}=${s.status}`).join(', ')}, ` +
+        `${changedFiles.size} changed file(s), ${endpoints.size} endpoint(s)`,
+    );
+
+    // ---- 3. The Brief model (structured, temperature 0 — NFR-7).
+    const { provider, model } = await resolveFeatureModel(this.container, workspaceId, 'risk_brief');
+    const llm = await this.container.llm(provider);
+    const messages = buildBriefMessages({
+      title: pull.title,
+      ...(hasBody ? { body } : {}),
+      ...(intentBlock ? { intentBlock } : {}),
+      ...(linkedIssue ? { linkedIssue } : {}),
+      ...(planDocs.length ? { planDocs } : {}),
+      ...(blastSummary ? { blastSummary } : {}),
+      ...(fileDigest ? { fileDigest } : {}),
+      sources,
+    });
+    log?.info(`brief: model ${provider}/${model}, ${messages.length} message(s)`);
+
+    // Let this THROW on provider/schema failure — nothing is persisted (AC-8).
+    const result = await llm.completeStructured({
+      model,
+      schema: LlmBriefCandidate,
+      schemaName: 'Brief',
+      messages,
+      temperature: 0,
+      maxTokens: 1500,
+    });
+
+    // ---- 4. Code-side gate: ground refs against the diff + blast, then derive
+    //         risk_level as the max severity of the grounded risks (AC-4/5).
+    const grounded = groundBriefRefs(
+      { risks: result.data.risks, review_focus: result.data.review_focus },
+      { changedFiles, endpoints },
+    );
+    for (const d of grounded.dropped) {
+      log?.info(`brief: dropped ref for PR #${pull.number} — ${d.ref} (${d.reason})`);
+    }
+
+    const brief: Brief = {
+      what: result.data.what,
+      why: result.data.why,
+      risk_level: riskLevelFrom(grounded.risks),
+      risks: grounded.risks,
+      review_focus: grounded.review_focus,
+    };
+
+    // ---- 5. Persist keyed by head SHA (AC-3/6) with the Brief's OWN cost
+    //         fields (NFR-5). Overwrites regardless of state_key match (AC-6).
+    await this.repo.upsertBrief(prId, brief, {
+      stateKey: pull.headSha,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      costUsd: result.costUsd,
+      model: `${provider}/${model}`,
+    });
+    log?.result(
+      `brief derived: risk_level=${brief.risk_level}, ${brief.risks.length} risk(s), ` +
+        `${brief.review_focus.length} focus item(s)`,
+    );
+
+    return (await this.repo.getBrief(prId)) as PrBriefRecord;
   }
 
   // ===========================================================================

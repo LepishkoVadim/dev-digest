@@ -25,5 +25,29 @@
     "blame": "blame",
     "noHistory": "No history available for this line.",
     "noCommits": "No commits found for this line."
+  },
+  "brief": {
+    "title": "PR brief",
+    "notDerived": "No brief yet.",
+    "notDerivedHint": "Generate a one-glance summary of what this PR does and where it is most likely to hurt.",
+    "generate": "Generate brief",
+    "regenerate": "Regenerate brief",
+    "stale": "PR changed since this brief — regenerate",
+    "riskLevel": "Risk",
+    "risk": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "riskAreas": "Risk areas",
+    "noRiskAreas": "No risk areas identified",
+    "reviewFocus": "Review focus",
+    "reviewFocusHint": "Read these first",
+    "noReviewFocus": "No focus files identified",
+    "verdict": "Review verdict",
+    "noVerdict": "No review has run yet",
+    "score": "Score",
+    "findings": "Findings",
+    "tokens": "tokens"
   }
 }

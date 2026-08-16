@@ -16,6 +16,8 @@ import { ReviewService } from './service.js';
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
  *   GET    /pulls/:id/intent                           → the persisted PR intent (404 when never derived)
  *   POST   /pulls/:id/intent                           → (re-)derive the PR intent (cheap classifier)
+ *   GET    /pulls/:id/brief                            → the persisted PR Brief (404 when never derived)
+ *   POST   /pulls/:id/brief                            → (re-)derive the PR Brief (risk_brief model)
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
@@ -156,6 +158,26 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       const { workspaceId } = await getContext(container, req);
       const intent = await service.deriveIntent(workspaceId, req.params.id);
       return { pr_id: req.params.id, ...intent };
+    },
+  );
+
+  // ---- PR Brief (the "what / why / where it hurts" Overview card) ---------
+  app.get('/pulls/:id/brief', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    const brief = await service.getBrief(workspaceId, req.params.id);
+    if (!brief) throw new NotFoundError('Brief not derived for this pull request');
+    return brief;
+  });
+
+  // Tight per-route limit (max 6 / 1 min — AC-7/NFR-3): this triggers an LLM
+  // call. On provider failure `deriveBrief` throws and the error handler
+  // surfaces the provider message; nothing is persisted (AC-8).
+  app.post(
+    '/pulls/:id/brief',
+    { schema: { params: IdParams }, config: { rateLimit: { max: 6, timeWindow: '1 minute' } } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      return service.deriveBrief(workspaceId, req.params.id);
     },
   );
 

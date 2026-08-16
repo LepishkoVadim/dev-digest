@@ -611,3 +611,153 @@ d('PR intent (Testcontainers pg)', () => {
     await app.close();
   });
 });
+
+/**
+ * PR Brief — the "what / why / where it hurts" card persisted per PR.
+ *
+ * The `risk_brief` feature model's registry default is `openrouter`/`openai/gpt-4.1`,
+ * so the Brief mock is registered under `openrouter` keyed by schemaName 'Brief'
+ * (alongside `Intent`). This MUST be stubbed — an unstubbed provider/schema makes
+ * a LIVE billed call.
+ */
+d('PR Brief (Testcontainers pg)', () => {
+  let pg: PgFixture;
+  let workspaceId: string;
+
+  beforeAll(async () => {
+    pg = await startPg();
+    await seed(pg.handle.db);
+    const [ws] = await pg.handle.db.select().from(t.workspaces);
+    workspaceId = ws!.id;
+  });
+  afterAll(async () => {
+    await pg?.stop();
+  });
+
+  // One grounded ref (src/config.ts is in DIFF) + one invented file + one
+  // invented endpoint (blast is empty in tests → endpoints all drop, AC-5/18).
+  const BRIEF_FIXTURE = {
+    what: 'Adds a hardcoded Stripe key to config.',
+    why: 'Wiring up billing.',
+    risks: [
+      {
+        kind: 'security',
+        title: 'Secret in source',
+        explanation: 'A live key is committed.',
+        severity: 'high',
+        file_refs: ['src/config.ts', 'src/GHOST.ts'],
+        endpoint_refs: ['POST /charge'],
+      },
+    ],
+    review_focus: [
+      { file: 'src/config.ts', line: 11, reason: 'the secret' },
+      { file: 'src/PHANTOM.ts', line: 1, reason: 'invented' },
+    ],
+  };
+
+  function appWithBrief(brief: unknown = BRIEF_FIXTURE) {
+    return buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        llm: {
+          // risk_brief + review_intent both resolve to openrouter (registry default),
+          // so the openrouter mock serves BOTH the Brief and Intent schemas.
+          openrouter: new MockLLMProvider('openai', {
+            structuredBySchema: {
+              Brief: brief,
+              Intent: { intent: 'i', in_scope: [], out_of_scope: [] },
+            },
+          }) as unknown as LLMProvider,
+        },
+      },
+    });
+  }
+
+  it('GET 404 before derive; POST persists (grounded + code-derived risk_level); GET 200 after', async () => {
+    const app = await appWithBrief();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+
+    // AC-2: GET before any derive is a 404, and no Brief row is written.
+    const before = await app.inject({ method: 'GET', url: `/pulls/${pr.id}/brief` });
+    expect(before.statusCode).toBe(404);
+    expect(
+      await pg.handle.db.select().from(t.prBrief).where(eq(t.prBrief.prId, pr.id)),
+    ).toHaveLength(0);
+
+    // AC-3: POST derives, persists keyed by head SHA, returns the Brief.
+    const post = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/brief` });
+    expect(post.statusCode).toBe(200);
+    const body = post.json();
+    expect(body.pr_id).toBe(pr.id);
+    expect(body.what).toBe(BRIEF_FIXTURE.what);
+    // AC-4: risk_level is code-derived (max = high), regardless of any model value.
+    expect(body.risk_level).toBe('high');
+    // AC-5: invented file ref dropped, real one kept.
+    expect(body.risks[0].file_refs).toEqual(['src/config.ts']);
+    // AC-18: blast empty in tests → all endpoint refs dropped.
+    expect(body.risks[0].endpoint_refs).toEqual([]);
+    // review_focus with a phantom file is dropped; the real one survives.
+    expect(body.review_focus.map((f: { file: string }) => f.file)).toEqual(['src/config.ts']);
+    // state_key = the PR head SHA (the staleness key).
+    expect(body.state_key).toBe(pr.headSha);
+    // NFR-5: cost fields come from the Brief's own StructuredResult.
+    expect(body.cost_usd).toBe(0.001);
+    expect(body.model).toBe('openrouter/openai/gpt-4.1');
+    expect(body.derived_at).toBeTruthy();
+
+    // AC-1: GET now returns the persisted Brief.
+    const after = await app.inject({ method: 'GET', url: `/pulls/${pr.id}/brief` });
+    expect(after.statusCode).toBe(200);
+    expect(after.json().what).toBe(BRIEF_FIXTURE.what);
+
+    await app.close();
+  });
+
+  it('a second POST overwrites regardless of state_key (AC-6)', async () => {
+    const app = await appWithBrief();
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/brief` });
+
+    const app2 = await appWithBrief({
+      ...BRIEF_FIXTURE,
+      what: 'REVISED brief.',
+      risks: [],
+    });
+    const second = (await app2.inject({ method: 'POST', url: `/pulls/${pr.id}/brief` })).json();
+    expect(second.what).toBe('REVISED brief.');
+    // Empty risks → risk_level low (AC-4).
+    expect(second.risk_level).toBe('low');
+
+    const rows = await pg.handle.db.select().from(t.prBrief).where(eq(t.prBrief.prId, pr.id));
+    expect(rows).toHaveLength(1);
+
+    await app.close();
+    await app2.close();
+  });
+
+  it('a schema-invalid model response fails the POST and persists nothing (AC-8)', async () => {
+    // Failure-injection = provider returning schema-invalid output (NOT an
+    // unstubbed provider, which would make a live call).
+    const app = await appWithBrief({ not_a_brief: true });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+
+    const post = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/brief` });
+    expect(post.statusCode).toBeGreaterThanOrEqual(400);
+    // Nothing persisted on failure.
+    expect(
+      await pg.handle.db.select().from(t.prBrief).where(eq(t.prBrief.prId, pr.id)),
+    ).toHaveLength(0);
+
+    await app.close();
+  });
+
+  // NOTE (AC-7/NFR-3): the `POST /pulls/:id/brief` route declares
+  // `config.rateLimit = { max: 6, timeWindow: '1 minute' }` (same proven shape
+  // as `POST /pulls/:id/intent`). It is NOT asserted here because the global
+  // rate-limit plugin is deliberately NOT registered under NODE_ENV=test
+  // (`src/app.ts:95`) so integration suites can hammer endpoints via inject().
+  // The limit is exercised only in a running (non-test) server.
+});
