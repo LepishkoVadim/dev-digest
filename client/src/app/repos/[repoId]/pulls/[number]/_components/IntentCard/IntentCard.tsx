@@ -4,12 +4,16 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, EmptyState, ErrorState, Icon, IconBtn, SectionLabel, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
-import { usePrIntent, useDeriveIntent } from "@/lib/hooks/reviews";
+import { usePrIntent, useDeriveIntent, useBrief } from "@/lib/hooks/reviews";
+import { RiskAreas } from "../PrBriefCard";
 import { s, CONFIDENCE_COLOR } from "./styles";
 
 interface IntentCardProps {
   /** Null while the PR is still resolving; the query stays disabled until it isn't. */
   prId: string | null;
+  /** For building GitHub blob links on the risk-area refs; plain-text fallback when missing. */
+  repoFullName: string | null;
+  headSha: string | null | undefined;
 }
 
 /**
@@ -20,10 +24,12 @@ interface IntentCardProps {
  * `unavailable` source is rendered as an explicit "missing context" line rather
  * than hidden, so the user can see the classification was working blind.
  */
-export function IntentCard({ prId }: IntentCardProps) {
+export function IntentCard({ prId, repoFullName, headSha }: IntentCardProps) {
   const t = useTranslations("brief");
   const { data, isLoading, error, refetch } = usePrIntent(prId);
   const derive = useDeriveIntent(prId);
+  // The Brief's risk areas render inside this card (shared query — no extra fetch).
+  const brief = useBrief(prId);
 
   // A 404 is the "never derived" state, not a failure.
   const notFound = error instanceof ApiError && error.status === 404;
@@ -133,6 +139,18 @@ export function IntentCard({ prId }: IntentCardProps) {
           <div style={s.missing}>
             <strong>{t("missingContext")}:</strong>{" "}
             {missing.map((src) => `${src.kind} (${src.ref})`).join(", ")}
+          </div>
+        )}
+
+        {/* Risk areas from the Brief (rendered only once a Brief exists). */}
+        {brief.data && (
+          <div style={s.riskAreas}>
+            <RiskAreas
+              risks={brief.data.risks}
+              riskLevel={brief.data.risk_level}
+              repoFullName={repoFullName}
+              headSha={headSha}
+            />
           </div>
         )}
 

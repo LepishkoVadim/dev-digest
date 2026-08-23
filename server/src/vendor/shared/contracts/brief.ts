@@ -155,3 +155,79 @@ export const PrBrief = z.object({
   history: PrHistory,
 });
 export type PrBrief = z.infer<typeof PrBrief>;
+
+// ---------------------------------------------------------------------------
+// PR Why + Risk Brief (the LIVE feature) — a NEW shape stored in `pr_brief.json`.
+//
+// Distinct from the dormant `PrBrief` above (which has no producer/consumer):
+// this is the one-glance "what / why / where it hurts" a reviewer sees on the
+// Overview. It reuses the leaf `RiskSeverity` enum but is otherwise independent.
+// ---------------------------------------------------------------------------
+
+/**
+ * One risk area the reviewer should watch. `file_refs` are repo-relative paths
+ * grounded against the diff's changed files; `endpoint_refs` are grounded
+ * against the blast report's `impacted_endpoints`. Both are dropped in code
+ * (never trusted from the model) when they name something outside the PR.
+ */
+export const BriefRisk = z.object({
+  kind: z.string(),
+  title: z.string(),
+  explanation: z.string(),
+  severity: RiskSeverity,
+  file_refs: z.array(z.string()),
+  /** Optional "METHOD /path" refs; grounded against blast impacted_endpoints. */
+  endpoint_refs: z.array(z.string()).nullish(),
+});
+export type BriefRisk = z.infer<typeof BriefRisk>;
+
+/** A "read these first" pointer: a changed file, optional line, and why. */
+export const ReviewFocus = z.object({
+  file: z.string(),
+  line: z.number().int().nullish(),
+  reason: z.string(),
+});
+export type ReviewFocus = z.infer<typeof ReviewFocus>;
+
+/**
+ * The Brief itself. `risk_level` is DERIVED IN CODE as the max severity across
+ * `risks[]` (the model never reports it — self-reported risk tracks commitment,
+ * not correctness), same "model proposes, code disposes" gate as Intent.
+ */
+export const Brief = z.object({
+  what: z.string(),
+  why: z.string(),
+  risk_level: RiskSeverity,
+  risks: z.array(BriefRisk),
+  review_focus: z.array(ReviewFocus),
+});
+export type Brief = z.infer<typeof Brief>;
+
+/**
+ * What the model returns — NO `risk_level` (code derives it) and `review_focus`
+ * / `file_refs` are ungrounded candidates the code filters before persistence.
+ */
+export const LlmBriefCandidate = z.object({
+  what: z.string().min(1),
+  why: z.string().min(1),
+  risks: z.array(BriefRisk),
+  review_focus: z.array(ReviewFocus),
+});
+export type LlmBriefCandidate = z.infer<typeof LlmBriefCandidate>;
+
+/**
+ * The persisted Brief transport shape: the `Brief` plus the head-SHA cache key
+ * (`state_key`) and the generation cost fields from its own `StructuredResult`.
+ * `derived_at` is storage-only (ISO stamp).
+ */
+export const PrBriefRecord = Brief.extend({
+  pr_id: z.string(),
+  /** Head SHA the Brief was derived against — the staleness cache key. */
+  state_key: z.string().nullish(),
+  tokens_in: z.number().int().nullish(),
+  tokens_out: z.number().int().nullish(),
+  cost_usd: z.number().nullish(),
+  model: z.string().nullish(),
+  derived_at: z.string().nullish(),
+});
+export type PrBriefRecord = z.infer<typeof PrBriefRecord>;

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision, index } from 'drizzle-orm/pg-core';
-import type { IntentSource } from '@devdigest/shared';
+import type { Brief, IntentSource } from '@devdigest/shared';
 import { now } from './_shared';
 import { workspaces } from './core';
 import { pullRequests } from './pulls';
@@ -77,5 +77,19 @@ export const prBrief = pgTable('pr_brief', {
   prId: uuid('pr_id')
     .primaryKey()
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
-  json: jsonb('json').notNull(),
+  /** The live `Brief` (what/why/risk_level/risks/review_focus). */
+  json: jsonb('json').$type<Brief>().notNull(),
+  /**
+   * Head SHA the Brief was derived against — the staleness cache key. Nullable
+   * (no volatile default → no table rewrite / backfill for the dormant rows).
+   */
+  stateKey: text('state_key'),
+  /** Generation cost from the Brief's own StructuredResult (NFR-5). */
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  costUsd: doublePrecision('cost_usd'),
+  /** `provider/model` that produced the Brief (auditability). */
+  model: text('model'),
+  /** When the Brief last derived. No volatile DEFAULT → no table rewrite. */
+  derivedAt: timestamp('derived_at', { withTimezone: true }),
 });

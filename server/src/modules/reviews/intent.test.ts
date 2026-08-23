@@ -9,11 +9,13 @@ import { describe, it, expect } from 'vitest';
 import type { IntentSource, UnifiedDiff } from '@devdigest/shared';
 import {
   MAX_DIGEST_FILES,
+  buildBriefMessages,
   buildIntentMessages,
   deriveConfidence,
   extractDocRefs,
   hunkHeaderDigest,
 } from './intent.js';
+import { riskLevelFrom } from './service.js';
 
 /** A diff whose raw text and hunks carry very recognisable "secret" content. */
 function diffWithSecrets(fileCount = 2): UnifiedDiff {
@@ -74,6 +76,61 @@ describe('hunkHeaderDigest — the metadata-only boundary', () => {
 
   it('renders nothing for an empty diff', () => {
     expect(hunkHeaderDigest({ raw: '', files: [] })).toBe('');
+  });
+});
+
+describe('buildBriefMessages — metadata-only, no diff body (NFR-1)', () => {
+  it('wraps untrusted parts and never leaks diff content', () => {
+    const digest = hunkHeaderDigest(diffWithSecrets());
+    const messages = buildBriefMessages({
+      title: 'Add rate limiting',
+      body: 'Closes #12',
+      fileDigest: digest,
+      blastSummary: 'Impacted endpoints: GET /users',
+      sources: [{ kind: 'pr_title', ref: '#1', status: 'used' }],
+    });
+    const user = messages.find((m) => m.role === 'user')!.content;
+
+    // The digest is present (positions) but no diff body leaks through.
+    expect(user).toContain('@@ -10,3 +10,4 @@');
+    expect(user).not.toContain('SUPER_SECRET_VALUE');
+    expect(user).not.toContain('REMOVED_SECRET');
+    expect(user).not.toContain('unchanged line of code');
+    // Untrusted framing is applied.
+    expect(user).toContain('<untrusted');
+  });
+
+  it('renders unavailable sources under "## Missing context", never inventing them', () => {
+    const messages = buildBriefMessages({
+      title: 't',
+      sources: [
+        { kind: 'pr_title', ref: '#1', status: 'used' },
+        { kind: 'linked_issue', ref: '#9', status: 'unavailable' },
+      ],
+    });
+    const user = messages.find((m) => m.role === 'user')!.content;
+    expect(user).toContain('## Missing context');
+    expect(user).toContain('linked_issue: #9');
+  });
+});
+
+describe('riskLevelFrom — code-derived max severity (AC-4)', () => {
+  const risk = (severity: 'high' | 'medium' | 'low') => ({
+    kind: 'k',
+    title: 't',
+    explanation: 'e',
+    severity,
+    file_refs: [],
+  });
+
+  it('is low for no risks (empty brief is not high-risk)', () => {
+    expect(riskLevelFrom([])).toBe('low');
+  });
+
+  it('takes the maximum severity across risks regardless of order', () => {
+    expect(riskLevelFrom([risk('low'), risk('high'), risk('medium')])).toBe('high');
+    expect(riskLevelFrom([risk('low'), risk('medium')])).toBe('medium');
+    expect(riskLevelFrom([risk('low'), risk('low')])).toBe('low');
   });
 });
 

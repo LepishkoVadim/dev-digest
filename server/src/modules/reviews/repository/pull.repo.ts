@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import { IntentConfidence, type Intent } from '@devdigest/shared';
+import { IntentConfidence, type Brief, type Intent, type PrBriefRecord } from '@devdigest/shared';
 import type { PullRow } from '../../../db/rows.js';
 
 // ---- PR lookup (workspace-scoped) -----------------------------------------
@@ -78,6 +78,60 @@ export async function getIntent(db: Db, prId: string): Promise<StoredIntent | un
     out_of_scope: row.outOfScope,
     confidence: IntentConfidence.safeParse(row.confidence).data ?? null,
     sources: row.sources,
+    model: row.model,
+    derived_at: row.derivedAt?.toISOString() ?? null,
+  };
+}
+
+// ---- brief ----------------------------------------------------------------
+
+/**
+ * The cost/audit metadata persisted alongside the Brief JSON. `state_key` is the
+ * head SHA the Brief was derived against (the staleness key).
+ */
+export interface BriefMeta {
+  stateKey: string;
+  tokensIn: number | null;
+  tokensOut: number | null;
+  costUsd: number | null;
+  model: string | null;
+}
+
+/**
+ * Upsert the live Brief for a PR. PK = `pr_id`, so a re-derive OVERWRITES —
+ * the Brief is per-PR (keyed on head SHA via `state_key`, not per-SHA rows).
+ */
+export async function upsertBrief(
+  db: Db,
+  prId: string,
+  brief: Brief,
+  meta: BriefMeta,
+): Promise<void> {
+  const values = {
+    json: brief,
+    stateKey: meta.stateKey,
+    tokensIn: meta.tokensIn,
+    tokensOut: meta.tokensOut,
+    costUsd: meta.costUsd,
+    model: meta.model,
+    derivedAt: new Date(),
+  };
+  await db
+    .insert(t.prBrief)
+    .values({ prId, ...values })
+    .onConflictDoUpdate({ target: t.prBrief.prId, set: values });
+}
+
+export async function getBrief(db: Db, prId: string): Promise<PrBriefRecord | undefined> {
+  const [row] = await db.select().from(t.prBrief).where(eq(t.prBrief.prId, prId));
+  if (!row) return undefined;
+  return {
+    ...row.json,
+    pr_id: prId,
+    state_key: row.stateKey,
+    tokens_in: row.tokensIn,
+    tokens_out: row.tokensOut,
+    cost_usd: row.costUsd,
     model: row.model,
     derived_at: row.derivedAt?.toISOString() ?? null,
   };

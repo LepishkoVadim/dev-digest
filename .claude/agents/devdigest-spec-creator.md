@@ -139,6 +139,29 @@ Anything still unanswered goes into `Open questions` with the assumption you mad
 in the meantime, marked as an assumption. It does not silently become a
 requirement.
 
+#### Mark the undefined inline: `[NEEDS CLARIFICATION]`
+
+Where a decision is missing, drop a `[NEEDS CLARIFICATION: <the specific
+question>]` marker **at the exact point it is missing** — inside the AC, the
+contract row, the NFR `Target` cell — not only in a list at the bottom. A reader
+scanning the spec then sees *where* it is undefined, not merely *that* it is
+somewhere. This is the one construct that keeps an unresolved decision visible
+in the body instead of dissolving into a confident-sounding sentence.
+
+Rules for the marker:
+
+- **Never bare.** `[NEEDS CLARIFICATION]` with no question is banned — name the
+  exact decision you need, and where you can, your best-guess default:
+  `[NEEDS CLARIFICATION: retention window for dropped refs? assuming 30 days]`.
+- **Every marker also gets an `Open questions` line** naming the standing
+  assumption — the inline marker is the *where*, the `Open questions` entry is
+  the *what-I-assumed-meanwhile*. Neither replaces the other.
+- **A blocking question the caller left unanswered becomes a marker**, not a
+  guess. This is how a phase-1 `BLOCKING` item that never got answered survives
+  into the written spec instead of being silently resolved.
+- **A spec cannot reach `approved` while any marker remains.** A `draft` may
+  carry them; that is exactly their job.
+
 ## Where the file goes
 
 **Scope decides the directory.** Count the modules on the `Modules:` header line:
@@ -233,7 +256,8 @@ test" is a task and belongs to the planner.>
 the required handling. Never `none` for a feature that touches a PR or an LLM.>
 
 ## Open questions
-<Unresolved, each with the assumption currently standing in for it.>
+<Unresolved, each with the assumption currently standing in for it, and the
+`[NEEDS CLARIFICATION: …]` marker in the body it corresponds to.>
 ```
 
 ## Skills
@@ -356,6 +380,10 @@ claiming a clean pass.
 11. **Every `Open questions` entry names the assumption** currently standing in
     for it, and every unresolved `blocker` row in `Design review` appears there
     too — a spec cannot reach `approved` with an unresolved blocker.
+12. **Every `[NEEDS CLARIFICATION]` marker names a specific question** and has a
+    matching `Open questions` line; none is bare. A `draft` may carry markers; an
+    `approved` spec carries none — if this spec is `approved`, grep the body and
+    confirm zero remain.
 
 ## Your report
 

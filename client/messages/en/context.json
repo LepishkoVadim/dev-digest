@@ -19,10 +19,6 @@
     "title": "No .md docs found",
     "body": "No .md docs under specs/, docs/, or insights/ in this repo. Docs are files in the repo — add them there, then rescan."
   },
-  "noRepo": {
-    "title": "No repo selected",
-    "body": "Pick a repo from the switcher to browse its project context."
-  },
   "type": {
     "specs": "specs",
     "docs": "docs",

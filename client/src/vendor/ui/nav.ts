@@ -24,7 +24,7 @@ export const NAV: NavGroup[] = [
     items: [
       { key: "pulls", label: "Pull Requests", icon: "GitPullRequest", href: "/repos/:repoId/pulls", gKey: "p" },
       { key: "onboarding-tour", label: "Onboarding Tour", icon: "Play", href: "/onboarding" },
-      { key: "context", label: "Project Context", icon: "Folder", href: "/project-context" },
+      { key: "context", label: "Project Context", icon: "Folder", href: "/repos/:repoId/project-context" },
     ],
   },
   {
