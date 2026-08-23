@@ -1,0 +1,34 @@
+{"run_id":"20260823T190417","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190417","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190417","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190417","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190523","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190523","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190523","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190523","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190533","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190533","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190533","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190533","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190613","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190613","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190613","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190613","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190832","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190832","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190832","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190832","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190834","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190834","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190834","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"fail"}
+{"run_id":"20260823T190834","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"fail"}
+{"run_id":"20260823T190924","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > skill:dependency-checker","outcome":"fail"}
+{"run_id":"20260823T190924","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > full report follows the required 5-section structure with a Mermaid graph","outcome":"fail"}
+{"run_id":"20260823T190924","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > distinguishes internal (path-alias) dependencies from external npm dependencies","outcome":"pass"}
+{"run_id":"20260823T190924","git_sha":"221623e-dirty","nodeid":"skills/dependency-checker/dependency-checker.eval.ts > severity tiers are used consistently and recommendations are specific, not vague","outcome":"pass"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > workflow:review","outcome":"fail"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > API-route task reads api-contracts AND pulls the architecture-reviewer","outcome":"fail"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > pipeline task follows CLAUDE.md routing to pipeline.md","outcome":"fail"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > CLAUDE.md routes a gotchas lookup to reviewer-core/insights","outcome":"fail"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > engineering-insights activates on a genuine discovery","outcome":"fail"}
+{"run_id":"20260823T191304","git_sha":"221623e-dirty","nodeid":"workflow/review-workflow.eval.ts > near-miss negative — explaining the same topic must NOT record an insight","outcome":"pass"}

@@ -1,0 +1,1521 @@
+{
+  "generatedAt": null,
+  "root": ".",
+  "orgScope": "@devdigest",
+  "components": [
+    {
+      "dir": "client",
+      "name": "@devdigest/web",
+      "version": "0.0.0",
+      "manager": "pnpm",
+      "dependencies": {
+        "@tanstack/react-query": "^5.62.8",
+        "lucide-react": "^0.469.0",
+        "mermaid": "^11.15.0",
+        "next": "^15.1.3",
+        "next-intl": "^3.26.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "react-markdown": "^9.0.3",
+        "recharts": "^2.15.0",
+        "remark-gfm": "^4.0.0",
+        "zod": "^3.24.1"
+      },
+      "devDependencies": {
+        "@tailwindcss/postcss": "^4.0.0",
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.1.0",
+        "@types/node": "^22.10.0",
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "@vitejs/plugin-react": "^4.3.4",
+        "jsdom": "^25.0.1",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.7.2",
+        "vitest": "^2.1.8"
+      },
+      "depCount": 11,
+      "devDepCount": 12,
+      "sizes": {
+        "packages": [
+          {
+            "name": "next",
+            "kb": 157356
+          },
+          {
+            "name": "mermaid",
+            "kb": 76540
+          },
+          {
+            "name": "lucide-react",
+            "kb": 37236
+          },
+          {
+            "name": "typescript",
+            "kb": 23452
+          },
+          {
+            "name": "prettier",
+            "kb": 9888
+          },
+          {
+            "name": "react-dom",
+            "kb": 7272
+          },
+          {
+            "name": "recharts",
+            "kb": 5444
+          },
+          {
+            "name": "zod",
+            "kb": 4776
+          },
+          {
+            "name": "jsdom",
+            "kb": 4400
+          },
+          {
+            "name": "eslint-plugin-react-hooks",
+            "kb": 4044
+          },
+          {
+            "name": "eslint",
+            "kb": 3884
+          },
+          {
+            "name": "@types/node",
+            "kb": 2576
+          },
+          {
+            "name": "vitest",
+            "kb": 1928
+          },
+          {
+            "name": "next-intl",
+            "kb": 1512
+          },
+          {
+            "name": "@tanstack/react-query",
+            "kb": 1164
+          },
+          {
+            "name": "tailwindcss",
+            "kb": 836
+          },
+          {
+            "name": "@testing-library/jest-dom",
+            "kb": 440
+          },
+          {
+            "name": "@types/react",
+            "kb": 412
+          },
+          {
+            "name": "@testing-library/react",
+            "kb": 400
+          },
+          {
+            "name": "postcss",
+            "kb": 356
+          },
+          {
+            "name": "react",
+            "kb": 260
+          },
+          {
+            "name": "@next/eslint-plugin-next",
+            "kb": 192
+          },
+          {
+            "name": "@tailwindcss/postcss",
+            "kb": 124
+          },
+          {
+            "name": "eslint-config-prettier",
+            "kb": 112
+          },
+          {
+            "name": "@vitejs/plugin-react",
+            "kb": 100
+          },
+          {
+            "name": "typescript-eslint",
+            "kb": 92
+          },
+          {
+            "name": "react-markdown",
+            "kb": 88
+          },
+          {
+            "name": "@types/react-dom",
+            "kb": 84
+          },
+          {
+            "name": "remark-gfm",
+            "kb": 52
+          },
+          {
+            "name": ".vite",
+            "kb": 12
+          }
+        ],
+        "totalKb": 345032,
+        "installed": 30
+      },
+      "audit": {
+        "status": "ok",
+        "severities": {
+          "info": 0,
+          "low": 3,
+          "moderate": 18,
+          "high": 10,
+          "critical": 1
+        }
+      }
+    },
+    {
+      "dir": "e2e",
+      "name": "@devdigest/e2e",
+      "version": "0.0.0",
+      "manager": "npm",
+      "dependencies": {},
+      "devDependencies": {
+        "@types/node": "^22.10.0",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2"
+      },
+      "depCount": 0,
+      "devDepCount": 3,
+      "sizes": {
+        "packages": [],
+        "totalKb": 0,
+        "installed": 0
+      },
+      "audit": {
+        "status": "ok",
+        "severities": {
+          "info": 0,
+          "low": 1,
+          "moderate": 0,
+          "high": 0,
+          "critical": 0,
+          "total": 1
+        }
+      }
+    },
+    {
+      "dir": "evals",
+      "name": "@devdigest/evals",
+      "version": "0.1.0",
+      "manager": "pnpm",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.3.198",
+        "openai": "^4.77.0"
+      },
+      "devDependencies": {
+        "@types/node": "^22.0.0",
+        "gray-matter": "^4.0.3",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0",
+        "vitest": "^2.1.0"
+      },
+      "depCount": 2,
+      "devDepCount": 5,
+      "sizes": {
+        "packages": [
+          {
+            "name": "typescript",
+            "kb": 23452
+          },
+          {
+            "name": "openai",
+            "kb": 7732
+          },
+          {
+            "name": "@anthropic-ai/claude-agent-sdk",
+            "kb": 3648
+          },
+          {
+            "name": "@types/node",
+            "kb": 2584
+          },
+          {
+            "name": "vitest",
+            "kb": 1928
+          },
+          {
+            "name": "tsx",
+            "kb": 692
+          },
+          {
+            "name": "gray-matter",
+            "kb": 96
+          }
+        ],
+        "totalKb": 40132,
+        "installed": 7
+      },
+      "audit": {
+        "status": "ok",
+        "severities": {
+          "info": 0,
+          "low": 1,
+          "moderate": 10,
+          "high": 8,
+          "critical": 1
+        }
+      }
+    },
+    {
+      "dir": "reviewer-core",
+      "name": "@devdigest/reviewer-core",
+      "version": "0.0.0",
+      "manager": "npm",
+      "dependencies": {
+        "openai": "^4.77.0",
+        "zod": "^3.24.1"
+      },
+      "devDependencies": {
+        "@types/node": "^22.10.0",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2",
+        "vitest": "^2.1.8"
+      },
+      "depCount": 2,
+      "devDepCount": 4,
+      "sizes": {
+        "packages": [
+          {
+            "name": "typescript",
+            "kb": 23452
+          },
+          {
+            "name": "vite",
+            "kb": 12960
+          },
+          {
+            "name": "esbuild",
+            "kb": 11260
+          },
+          {
+            "name": "@esbuild/linux-x64",
+            "kb": 11120
+          },
+          {
+            "name": "openai",
+            "kb": 10228
+          },
+          {
+            "name": "zod",
+            "kb": 5240
+          },
+          {
+            "name": "eslint",
+            "kb": 3868
+          },
+          {
+            "name": "@typescript-eslint/eslint-plugin",
+            "kb": 3508
+          },
+          {
+            "name": "@babel/types",
+            "kb": 3272
+          },
+          {
+            "name": "rollup",
+            "kb": 2868
+          },
+          {
+            "name": "@types/node",
+            "kb": 2576
+          },
+          {
+            "name": "@rollup/rollup-linux-x64-musl",
+            "kb": 2064
+          },
+          {
+            "name": "@rollup/rollup-linux-x64-gnu",
+            "kb": 2032
+          },
+          {
+            "name": "@babel/parser",
+            "kb": 1992
+          },
+          {
+            "name": "vitest",
+            "kb": 1912
+          },
+          {
+            "name": "@typescript-eslint/scope-manager",
+            "kb": 1676
+          },
+          {
+            "name": "glob",
+            "kb": 1336
+          },
+          {
+            "name": "ajv",
+            "kb": 1160
+          },
+          {
+            "name": "esquery",
+            "kb": 1112
+          },
+          {
+            "name": "lru-cache",
+            "kb": 844
+          },
+          {
+            "name": "tsx",
+            "kb": 688
+          },
+          {
+            "name": "magicast",
+            "kb": 684
+          },
+          {
+            "name": "minimatch",
+            "kb": 680
+          },
+          {
+            "name": "@typescript-eslint/typescript-estree",
+            "kb": 644
+          },
+          {
+            "name": "uri-js",
+            "kb": 604
+          },
+          {
+            "name": "@eslint-community/eslint-utils",
+            "kb": 588
+          },
+          {
+            "name": "acorn",
+            "kb": 580
+          },
+          {
+            "name": "path-scurry",
+            "kb": 572
+          },
+          {
+            "name": "chai",
+            "kb": 552
+          },
+          {
+            "name": "@eslint-community/regexpp",
+            "kb": 484
+          },
+          {
+            "name": "magic-string",
+            "kb": 484
+          },
+          {
+            "name": "istanbul-reports",
+            "kb": 472
+          },
+          {
+            "name": "web-streams-polyfill",
+            "kb": 468
+          },
+          {
+            "name": "@typescript-eslint/utils",
+            "kb": 456
+          },
+          {
+            "name": "@bcoe/v8-coverage",
+            "kb": 440
+          },
+          {
+            "name": "minipass",
+            "kb": 404
+          },
+          {
+            "name": "@eslint/config-array",
+            "kb": 376
+          },
+          {
+            "name": "ts-api-utils",
+            "kb": 368
+          },
+          {
+            "name": "jackspeak",
+            "kb": 364
+          },
+          {
+            "name": "postcss",
+            "kb": 344
+          },
+          {
+            "name": "vite-node",
+            "kb": 308
+          },
+          {
+            "name": "@jridgewell/trace-mapping",
+            "kb": 304
+          },
+          {
+            "name": "semver",
+            "kb": 292
+          },
+          {
+            "name": "loupe",
+            "kb": 288
+          },
+          {
+            "name": "tr46",
+            "kb": 280
+          },
+          {
+            "name": "formdata-node",
+            "kb": 248
+          },
+          {
+            "name": "@typescript-eslint/type-utils",
+            "kb": 232
+          },
+          {
+            "name": "mime-db",
+            "kb": 220
+          },
+          {
+            "name": "@vitest/utils",
+            "kb": 216
+          },
+          {
+            "name": "event-target-shim",
+            "kb": 216
+          },
+          {
+            "name": "eslint-scope",
+            "kb": 212
+          },
+          {
+            "name": "form-data-encoder",
+            "kb": 208
+          },
+          {
+            "name": "wrap-ansi-cjs",
+            "kb": 208
+          },
+          {
+            "name": "undici-types",
+            "kb": 200
+          },
+          {
+            "name": "@vitest/expect",
+            "kb": 188
+          },
+          {
+            "name": "node-fetch",
+            "kb": 188
+          },
+          {
+            "name": "source-map-js",
+            "kb": 188
+          },
+          {
+            "name": "@jridgewell/gen-mapping",
+            "kb": 184
+          },
+          {
+            "name": "@vitest/mocker",
+            "kb": 184
+          },
+          {
+            "name": "foreground-child",
+            "kb": 184
+          },
+          {
+            "name": "@jridgewell/sourcemap-codec",
+            "kb": 180
+          },
+          {
+            "name": "signal-exit",
+            "kb": 180
+          },
+          {
+            "name": "math-intrinsics",
+            "kb": 172
+          },
+          {
+            "name": "node-domexception",
+            "kb": 168
+          },
+          {
+            "name": "@typescript-eslint/types",
+            "kb": 156
+          },
+          {
+            "name": "expect-type",
+            "kb": 156
+          },
+          {
+            "name": "@eslint/plugin-kit",
+            "kb": 148
+          },
+          {
+            "name": "emoji-regex",
+            "kb": 148
+          },
+          {
+            "name": "string-width-cjs",
+            "kb": 148
+          },
+          {
+            "name": "@vitest/coverage-v8",
+            "kb": 144
+          },
+          {
+            "name": "espree",
+            "kb": 140
+          },
+          {
+            "name": "@vitest/runner",
+            "kb": 132
+          },
+          {
+            "name": "@pkgjs/parseargs",
+            "kb": 128
+          },
+          {
+            "name": "cac",
+            "kb": 128
+          },
+          {
+            "name": "nanoid",
+            "kb": 128
+          },
+          {
+            "name": "@vitest/snapshot",
+            "kb": 124
+          },
+          {
+            "name": "brace-expansion",
+            "kb": 124
+          },
+          {
+            "name": "es-module-lexer",
+            "kb": 124
+          },
+          {
+            "name": "picomatch",
+            "kb": 124
+          },
+          {
+            "name": "@ampproject/remapping",
+            "kb": 120
+          },
+          {
+            "name": "@eslint/config-helpers",
+            "kb": 116
+          },
+          {
+            "name": "@eslint/core",
+            "kb": 116
+          },
+          {
+            "name": "abort-controller",
+            "kb": 116
+          },
+          {
+            "name": "@humanfs/core",
+            "kb": 108
+          },
+          {
+            "name": "flatted",
+            "kb": 108
+          },
+          {
+            "name": "@eslint/object-schema",
+            "kb": 104
+          },
+          {
+            "name": "form-data",
+            "kb": 104
+          },
+          {
+            "name": "es-errors",
+            "kb": 100
+          },
+          {
+            "name": "call-bind-apply-helpers",
+            "kb": 96
+          },
+          {
+            "name": "eslint-config-prettier",
+            "kb": 96
+          },
+          {
+            "name": "tinypool",
+            "kb": 96
+          },
+          {
+            "name": "@humanwhocodes/retry",
+            "kb": 92
+          },
+          {
+            "name": "asynckit",
+            "kb": 92
+          },
+          {
+            "name": "fast-json-stable-stringify",
+            "kb": 92
+          },
+          {
+            "name": "has-symbols",
+            "kb": 88
+          },
+          {
+            "name": "tinybench",
+            "kb": 88
+          },
+          {
+            "name": "@jridgewell/resolve-uri",
+            "kb": 84
+          },
+          {
+            "name": "package-json-from-dist",
+            "kb": 84
+          },
+          {
+            "name": "pathe",
+            "kb": 84
+          },
+          {
+            "name": "@babel/helper-validator-identifier",
+            "kb": 80
+          },
+          {
+            "name": "function-bind",
+            "kb": 80
+          },
+          {
+            "name": "get-intrinsic",
+            "kb": 80
+          },
+          {
+            "name": "has-tostringtag",
+            "kb": 80
+          },
+          {
+            "name": "whatwg-url",
+            "kb": 80
+          },
+          {
+            "name": "@humanfs/node",
+            "kb": 76
+          },
+          {
+            "name": "balanced-match",
+            "kb": 76
+          },
+          {
+            "name": "es-object-atoms",
+            "kb": 76
+          },
+          {
+            "name": "esutils",
+            "kb": 76
+          },
+          {
+            "name": "fdir",
+            "kb": 76
+          },
+          {
+            "name": "istanbul-lib-source-maps",
+            "kb": 76
+          },
+          {
+            "name": "json-stable-stringify-without-jsonify",
+            "kb": 76
+          },
+          {
+            "name": "dunder-proto",
+            "kb": 72
+          },
+          {
+            "name": "get-proto",
+            "kb": 72
+          },
+          {
+            "name": "ignore",
+            "kb": 72
+          },
+          {
+            "name": "istanbul-lib-report",
+            "kb": 72
+          },
+          {
+            "name": "optionator",
+            "kb": 72
+          },
+          {
+            "name": "typescript-eslint",
+            "kb": 72
+          },
+          {
+            "name": "debug",
+            "kb": 68
+          },
+          {
+            "name": "prelude-ls",
+            "kb": 68
+          },
+          {
+            "name": "tinyglobby",
+            "kb": 68
+          },
+          {
+            "name": "agentkeepalive",
+            "kb": 64
+          },
+          {
+            "name": "eslint-visitor-keys",
+            "kb": 64
+          },
+          {
+            "name": "istanbul-lib-coverage",
+            "kb": 64
+          },
+          {
+            "name": "tinyexec",
+            "kb": 64
+          },
+          {
+            "name": "@humanwhocodes/module-importer",
+            "kb": 60
+          },
+          {
+            "name": "@vitest/pretty-format",
+            "kb": 60
+          },
+          {
+            "name": "gopd",
+            "kb": 60
+          },
+          {
+            "name": "html-escaper",
+            "kb": 60
+          },
+          {
+            "name": "@isaacs/cliui",
+            "kb": 56
+          },
+          {
+            "name": "es-define-property",
+            "kb": 56
+          },
+          {
+            "name": "estraverse",
+            "kb": 56
+          },
+          {
+            "name": "estree-walker",
+            "kb": 56
+          },
+          {
+            "name": "json-schema-traverse",
+            "kb": 56
+          },
+          {
+            "name": "@babel/helper-string-parser",
+            "kb": 52
+          },
+          {
+            "name": "@typescript-eslint/visitor-keys",
+            "kb": 52
+          },
+          {
+            "name": "cross-spawn",
+            "kb": 52
+          },
+          {
+            "name": "es-set-tostringtag",
+            "kb": 52
+          },
+          {
+            "name": "fast-deep-equal",
+            "kb": 52
+          },
+          {
+            "name": "flat-cache",
+            "kb": 52
+          },
+          {
+            "name": "punycode",
+            "kb": 52
+          },
+          {
+            "name": "strip-ansi-cjs",
+            "kb": 52
+          },
+          {
+            "name": "@types/json-schema",
+            "kb": 48
+          },
+          {
+            "name": "@typescript-eslint/project-service",
+            "kb": 48
+          },
+          {
+            "name": "color-convert",
+            "kb": 48
+          },
+          {
+            "name": "deep-is",
+            "kb": 48
+          },
+          {
+            "name": "hasown",
+            "kb": 48
+          },
+          {
+            "name": "@types/estree",
+            "kb": 44
+          },
+          {
+            "name": "@typescript-eslint/tsconfig-utils",
+            "kb": 44
+          },
+          {
+            "name": "@vitest/spy",
+            "kb": 44
+          },
+          {
+            "name": "acorn-jsx",
+            "kb": 44
+          },
+          {
+            "name": "isexe",
+            "kb": 44
+          },
+          {
+            "name": "keyv",
+            "kb": 44
+          },
+          {
+            "name": "levn",
+            "kb": 44
+          },
+          {
+            "name": "std-env",
+            "kb": 44
+          },
+          {
+            "name": "tinyrainbow",
+            "kb": 44
+          },
+          {
+            "name": "type-check",
+            "kb": 44
+          },
+          {
+            "name": "@istanbuljs/schema",
+            "kb": 40
+          },
+          {
+            "name": "@typescript-eslint/parser",
+            "kb": 40
+          },
+          {
+            "name": "deep-eql",
+            "kb": 40
+          },
+          {
+            "name": "tinyspy",
+            "kb": 40
+          },
+          {
+            "name": "why-is-node-running",
+            "kb": 40
+          },
+          {
+            "name": "@humanfs/types",
+            "kb": 36
+          },
+          {
+            "name": "ansi-styles",
+            "kb": 36
+          },
+          {
+            "name": "combined-stream",
+            "kb": 36
+          },
+          {
+            "name": "test-exclude",
+            "kb": 36
+          },
+          {
+            "name": "delayed-stream",
+            "kb": 32
+          },
+          {
+            "name": "esrecurse",
+            "kb": 32
+          },
+          {
+            "name": "json-buffer",
+            "kb": 32
+          },
+          {
+            "name": "mime-types",
+            "kb": 32
+          },
+          {
+            "name": "picocolors",
+            "kb": 32
+          },
+          {
+            "name": "stackback",
+            "kb": 32
+          },
+          {
+            "name": "webidl-conversions",
+            "kb": 32
+          },
+          {
+            "name": "which",
+            "kb": 32
+          },
+          {
+            "name": "@types/node-fetch",
+            "kb": 28
+          },
+          {
+            "name": "check-error",
+            "kb": 28
+          },
+          {
+            "name": "file-entry-cache",
+            "kb": 28
+          },
+          {
+            "name": "imurmurhash",
+            "kb": 28
+          },
+          {
+            "name": "siginfo",
+            "kb": 28
+          },
+          {
+            "name": "word-wrap",
+            "kb": 28
+          },
+          {
+            "name": "wrap-ansi",
+            "kb": 28
+          },
+          {
+            "name": "ansi-regex",
+            "kb": 24
+          },
+          {
+            "name": "assertion-error",
+            "kb": 24
+          },
+          {
+            "name": "color-name",
+            "kb": 24
+          },
+          {
+            "name": "eastasianwidth",
+            "kb": 24
+          },
+          {
+            "name": "escape-string-regexp",
+            "kb": 24
+          },
+          {
+            "name": "find-up",
+            "kb": 24
+          },
+          {
+            "name": "glob-parent",
+            "kb": 24
+          },
+          {
+            "name": "has-flag",
+            "kb": 24
+          },
+          {
+            "name": "humanize-ms",
+            "kb": 24
+          },
+          {
+            "name": "is-fullwidth-code-point",
+            "kb": 24
+          },
+          {
+            "name": "is-glob",
+            "kb": 24
+          },
+          {
+            "name": "locate-path",
+            "kb": 24
+          },
+          {
+            "name": "make-dir",
+            "kb": 24
+          },
+          {
+            "name": "p-limit",
+            "kb": 24
+          },
+          {
+            "name": "p-locate",
+            "kb": 24
+          },
+          {
+            "name": "path-exists",
+            "kb": 24
+          },
+          {
+            "name": "path-key",
+            "kb": 24
+          },
+          {
+            "name": "pathval",
+            "kb": 24
+          },
+          {
+            "name": "shebang-regex",
+            "kb": 24
+          },
+          {
+            "name": "string-width",
+            "kb": 24
+          },
+          {
+            "name": "strip-ansi",
+            "kb": 24
+          },
+          {
+            "name": "supports-color",
+            "kb": 24
+          },
+          {
+            "name": "yocto-queue",
+            "kb": 24
+          },
+          {
+            "name": "@types/esrecurse",
+            "kb": 20
+          },
+          {
+            "name": "fast-levenshtein",
+            "kb": 20
+          },
+          {
+            "name": "is-extglob",
+            "kb": 20
+          },
+          {
+            "name": "ms",
+            "kb": 20
+          },
+          {
+            "name": "shebang-command",
+            "kb": 20
+          },
+          {
+            "name": "natural-compare",
+            "kb": 16
+          },
+          {
+            "name": ".vite",
+            "kb": 12
+          }
+        ],
+        "totalKb": 128932,
+        "installed": 210
+      },
+      "audit": {
+        "status": "ok",
+        "severities": {
+          "info": 0,
+          "low": 0,
+          "moderate": 3,
+          "high": 4,
+          "critical": 1,
+          "total": 8
+        }
+      }
+    },
+    {
+      "dir": "server",
+      "name": "@devdigest/api",
+      "version": "0.0.0",
+      "manager": "pnpm",
+      "dependencies": {
+        "@anthropic-ai/sdk": "^0.33.1",
+        "@ast-grep/napi": "0.43.0",
+        "@fastify/autoload": "^6.0.3",
+        "@fastify/cors": "^10.0.2",
+        "@fastify/helmet": "^13.0.2",
+        "@fastify/rate-limit": "^11.0.0",
+        "@vscode/ripgrep": "^1.15.9",
+        "dependency-cruiser": "^17.4.3",
+        "dotenv": "^16.4.7",
+        "drizzle-orm": "^0.38.3",
+        "fastify": "^5.2.0",
+        "fastify-sse-v2": "^4.2.1",
+        "fastify-type-provider-zod": "^4.0.2",
+        "graphology": "^0.26.0",
+        "graphology-metrics": "^2.4.0",
+        "js-tiktoken": "^1.0.21",
+        "octokit": "^4.0.3",
+        "openai": "^4.77.0",
+        "p-queue": "^8.0.1",
+        "postgres": "^3.4.5",
+        "simple-git": "^3.27.0",
+        "zod": "^3.24.1"
+      },
+      "devDependencies": {
+        "@testcontainers/postgresql": "^10.16.0",
+        "@types/node": "^22.10.0",
+        "drizzle-kit": "^0.30.1",
+        "pino-pretty": "^13.0.0",
+        "testcontainers": "^10.16.0",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2",
+        "vitest": "^2.1.8"
+      },
+      "depCount": 22,
+      "devDepCount": 8,
+      "sizes": {
+        "packages": [
+          {
+            "name": "typescript",
+            "kb": 23452
+          },
+          {
+            "name": "js-tiktoken",
+            "kb": 20928
+          },
+          {
+            "name": "drizzle-orm",
+            "kb": 13088
+          },
+          {
+            "name": "openai",
+            "kb": 7732
+          },
+          {
+            "name": "drizzle-kit",
+            "kb": 7616
+          },
+          {
+            "name": "zod",
+            "kb": 4776
+          },
+          {
+            "name": "eslint",
+            "kb": 3880
+          },
+          {
+            "name": "fastify",
+            "kb": 3668
+          },
+          {
+            "name": "graphology",
+            "kb": 2740
+          },
+          {
+            "name": "@types/node",
+            "kb": 2576
+          },
+          {
+            "name": "vitest",
+            "kb": 1932
+          },
+          {
+            "name": "@anthropic-ai/sdk",
+            "kb": 1896
+          },
+          {
+            "name": "dependency-cruiser",
+            "kb": 1764
+          },
+          {
+            "name": "@fastify/autoload",
+            "kb": 1692
+          },
+          {
+            "name": "simple-git",
+            "kb": 1380
+          },
+          {
+            "name": "testcontainers",
+            "kb": 1256
+          },
+          {
+            "name": "tsx",
+            "kb": 692
+          },
+          {
+            "name": "fflate",
+            "kb": 620
+          },
+          {
+            "name": "pino-pretty",
+            "kb": 488
+          },
+          {
+            "name": "@ast-grep/napi",
+            "kb": 404
+          },
+          {
+            "name": "postgres",
+            "kb": 392
+          },
+          {
+            "name": "graphology-metrics",
+            "kb": 328
+          },
+          {
+            "name": "@fastify/rate-limit",
+            "kb": 308
+          },
+          {
+            "name": "@fastify/cors",
+            "kb": 192
+          },
+          {
+            "name": "@fastify/helmet",
+            "kb": 132
+          },
+          {
+            "name": "dotenv",
+            "kb": 116
+          },
+          {
+            "name": "eslint-config-prettier",
+            "kb": 112
+          },
+          {
+            "name": "octokit",
+            "kb": 104
+          },
+          {
+            "name": "fastify-sse-v2",
+            "kb": 96
+          },
+          {
+            "name": "typescript-eslint",
+            "kb": 92
+          },
+          {
+            "name": "p-queue",
+            "kb": 84
+          },
+          {
+            "name": "fastify-type-provider-zod",
+            "kb": 68
+          },
+          {
+            "name": "@testcontainers/postgresql",
+            "kb": 48
+          },
+          {
+            "name": "@vscode/ripgrep",
+            "kb": 28
+          },
+          {
+            "name": ".vite",
+            "kb": 12
+          }
+        ],
+        "totalKb": 104692,
+        "installed": 35
+      },
+      "audit": {
+        "status": "ok",
+        "severities": {
+          "info": 0,
+          "low": 3,
+          "moderate": 14,
+          "high": 17,
+          "critical": 1
+        }
+      }
+    }
+  ],
+  "internalImports": {
+    "client": {
+      "@devdigest/shared": 36,
+      "@devdigest/ui": 50,
+      "@devdigest/ui/styles.css": 1
+    },
+    "e2e": {},
+    "evals": {},
+    "reviewer-core": {
+      "@devdigest/shared": 9
+    },
+    "server": {
+      "@devdigest/shared": 355,
+      "@devdigest/ui": 138,
+      "@devdigest/ui/styles.css": 2,
+      "@devdigest/reviewer-core": 48
+    }
+  },
+  "duplicates": [
+    {
+      "pkg": "@types/node",
+      "count": 5,
+      "components": [
+        "client",
+        "e2e",
+        "evals",
+        "reviewer-core",
+        "server"
+      ]
+    },
+    {
+      "pkg": "typescript",
+      "count": 5,
+      "components": [
+        "client",
+        "e2e",
+        "evals",
+        "reviewer-core",
+        "server"
+      ]
+    },
+    {
+      "pkg": "vitest",
+      "count": 4,
+      "components": [
+        "client",
+        "evals",
+        "reviewer-core",
+        "server"
+      ]
+    },
+    {
+      "pkg": "tsx",
+      "count": 4,
+      "components": [
+        "e2e",
+        "evals",
+        "reviewer-core",
+        "server"
+      ]
+    },
+    {
+      "pkg": "zod",
+      "count": 3,
+      "components": [
+        "client",
+        "reviewer-core",
+        "server"
+      ]
+    },
+    {
+      "pkg": "openai",
+      "count": 3,
+      "components": [
+        "evals",
+        "reviewer-core",
+        "server"
+      ]
+    }
+  ],
+  "versionConflicts": [
+    {
+      "pkg": "@types/node",
+      "ranges": [
+        {
+          "component": "client",
+          "range": "^22.10.0"
+        },
+        {
+          "component": "e2e",
+          "range": "^22.10.0"
+        },
+        {
+          "component": "evals",
+          "range": "^22.0.0"
+        },
+        {
+          "component": "reviewer-core",
+          "range": "^22.10.0"
+        },
+        {
+          "component": "server",
+          "range": "^22.10.0"
+        }
+      ]
+    },
+    {
+      "pkg": "typescript",
+      "ranges": [
+        {
+          "component": "client",
+          "range": "^5.7.2"
+        },
+        {
+          "component": "e2e",
+          "range": "^5.7.2"
+        },
+        {
+          "component": "evals",
+          "range": "^5.6.0"
+        },
+        {
+          "component": "reviewer-core",
+          "range": "^5.7.2"
+        },
+        {
+          "component": "server",
+          "range": "^5.7.2"
+        }
+      ]
+    },
+    {
+      "pkg": "vitest",
+      "ranges": [
+        {
+          "component": "client",
+          "range": "^2.1.8"
+        },
+        {
+          "component": "evals",
+          "range": "^2.1.0"
+        },
+        {
+          "component": "reviewer-core",
+          "range": "^2.1.8"
+        },
+        {
+          "component": "server",
+          "range": "^2.1.8"
+        }
+      ]
+    },
+    {
+      "pkg": "tsx",
+      "ranges": [
+        {
+          "component": "e2e",
+          "range": "^4.19.2"
+        },
+        {
+          "component": "evals",
+          "range": "^4.19.0"
+        },
+        {
+          "component": "reviewer-core",
+          "range": "^4.19.2"
+        },
+        {
+          "component": "server",
+          "range": "^4.19.2"
+        }
+      ]
+    }
+  ],
+  "orphans": [
+    "mcp-server"
+  ]
+}
