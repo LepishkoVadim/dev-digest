@@ -4,10 +4,11 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, EmptyState, ErrorState, Icon, Markdown, Skeleton, type Crumb } from "@devdigest/ui";
 import type { DocListItem } from "@devdigest/shared";
-import { AppShell } from "../../../../components/app-shell";
-import { useActiveRepo } from "../../../../lib/repo-context";
-import { useRepoDocs, useRescanDocs, useDocPreview } from "../../../../lib/hooks/docs";
-import { splitDocPath } from "../../../../lib/doc-badge";
+import { AppShell } from "@/components/app-shell";
+import { RepoNotFound } from "@/components/repo-not-found";
+import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
+import { useRepoDocs, useRescanDocs, useDocPreview } from "@/lib/hooks/docs";
+import { splitDocPath } from "@/lib/doc-badge";
 import { s } from "./styles";
 
 /** Format an ISO timestamp as a short "Nm ago" relative time (footer). */
@@ -25,10 +26,14 @@ function scannedAgo(iso: string): string {
  * left column, previews a selected doc read-only on the right, shows "Used by N
  * agents", and a footer with the file count + last-scanned time. No
  * chunk/coverage/index metric; no authoring control (read-only).
+ *
+ * `repoId` is passed explicitly from the route (`/repos/:repoId/project-context`),
+ * mirroring the pulls pages — not resolved implicitly via `useActiveRepo()`.
  */
-export function ProjectContextView() {
+export function ProjectContextView({ repoId }: { repoId: string }) {
   const t = useTranslations("context");
-  const { repoId, activeRepo, reposLoaded } = useActiveRepo();
+  const { activeRepo } = useActiveRepo();
+  const repoNotFound = useRepoNotFound(repoId);
   const { data, isLoading, isError, refetch } = useRepoDocs(repoId);
   const rescan = useRescanDocs();
   const [selected, setSelected] = React.useState<string | null>(null);
@@ -42,10 +47,11 @@ export function ProjectContextView() {
     { label: t("breadcrumb") },
   ];
 
-  if (reposLoaded && !repoId) {
+  // Stale/unknown :repoId → friendly empty state, same as the pulls pages.
+  if (repoNotFound) {
     return (
       <AppShell crumb={crumb}>
-        <EmptyState icon="Folder" title={t("noRepo.title")} body={t("noRepo.body")} />
+        <RepoNotFound />
       </AppShell>
     );
   }

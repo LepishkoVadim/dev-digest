@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { DocList } from "@devdigest/shared";
-import messages from "../../../../../messages/en/context.json";
+import messages from "../../../../../../../messages/en/context.json";
 
 const state: {
   docs?: DocList;
@@ -13,13 +13,17 @@ const state: {
 // AppShell pulls in next/navigation (useRouter) + shell context; render children
 // passthrough so the test targets the reader content, matching the repo's
 // convention of testing inner views rather than the shell wrapper.
-vi.mock("../../../../components/app-shell", () => ({
+vi.mock("@/components/app-shell", () => ({
   AppShell: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock("../../../../lib/repo-context", () => ({
-  useActiveRepo: () => ({ repoId: "r1", activeRepo: null, reposLoaded: true }),
+vi.mock("@/components/repo-not-found", () => ({
+  RepoNotFound: () => "repo not found",
 }));
-vi.mock("../../../../lib/hooks/docs", () => ({
+vi.mock("@/lib/repo-context", () => ({
+  useActiveRepo: () => ({ activeRepo: null }),
+  useRepoNotFound: () => false,
+}));
+vi.mock("@/lib/hooks/docs", () => ({
   useRepoDocs: () => ({
     data: state.docs,
     isLoading: state.isLoading,
@@ -43,7 +47,7 @@ function renderView() {
   render(
     <NextIntlClientProvider locale="en" messages={{ context: messages }}>
       <div data-theme="dark">
-        <ProjectContextView />
+        <ProjectContextView repoId="r1" />
       </div>
     </NextIntlClientProvider>,
   );
