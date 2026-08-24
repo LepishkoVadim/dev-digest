@@ -47,7 +47,7 @@ export function SkillEditor({ skill, tab, onTab }: { skill: Skill; tab: string; 
         {tab === "preview" && <PreviewTab skill={skill} />}
         {tab === "versions" && <VersionsTab skill={skill} />}
         {tab === "stats" && <StatsTab skill={skill} />}
-        {tab === "evals" && <EvalsTab />}
+        {tab === "evals" && <EvalsTab skillId={skill.id} />}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import repoIntel from './repo-intel/routes.js';
 import conventions from './conventions/routes.js';
 import blast from './blast/routes.js';
 import docs from './docs/routes.js';
+import evals from './evals/routes.js';
 
 /**
  * Module registry. Each feature module is a Fastify plugin in
@@ -38,4 +39,5 @@ export const modules: Record<string, FastifyPluginAsync> = {
   conventions,
   blast,
   docs,
+  evals,
 };

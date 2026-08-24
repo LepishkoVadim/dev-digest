@@ -1,4 +1,25 @@
 {
+  "overview": {
+    "title": "Eval Dashboard",
+    "subtitle": "Regression harness across all reviewer agents · pick an agent to see its cases and runs",
+    "noAgents": "No agents yet. Create an agent, then turn review findings into eval cases.",
+    "runAll": "Run all agents",
+    "running": "Running…",
+    "ranAll": "Ran {count} agents.",
+    "runFailed": "Couldn't run all agents.",
+    "recentRuns": "Recent runs",
+    "lastRun": "Last run {version} · {when} · {passed}/{total} pass",
+    "configure": "Configure eval cases →",
+    "passOne": "1/1",
+    "failOne": "0/1",
+    "col": {
+      "agent": "Agent",
+      "case": "Case",
+      "date": "Date",
+      "version": "Ver",
+      "pass": "Pass"
+    }
+  },
   "dashboard": {
     "defaultTitle": "Eval Dashboard",
     "loading": "Loading eval metrics…",
@@ -32,6 +53,9 @@
   },
   "caseEditor": {
     "newCase": "New eval case",
+    "savedToast": "Eval case saved — open the agent's Evals tab to run it.",
+    "saveFailedToast": "Couldn't save the eval case.",
+    "runFailedToast": "Couldn't run the eval case.",
     "caseTitle": "Eval case · {name}",
     "runCase": "Run case",
     "running": "Running…",
@@ -40,8 +64,14 @@
     "nameLabel": "Name",
     "namePlaceholder": "stripe-key-leak",
     "inputLabel": "Input",
+    "subtitle": "assert the expected output",
+    "seededSubtitle": "Seeded from an accepted finding · assert the expected output",
+    "actualOutput": "Actual output",
+    "neverRun": "Never run yet",
+    "runOnSave": "Run on save",
     "tabs": {
       "diff": "Diff",
+      "files": "Files",
       "prMeta": "PR meta"
     },
     "diffPlaceholder": "--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"sk_live_...\"",
@@ -60,7 +90,17 @@
   "evalsTab": {
     "metricsTitle": "Eval metrics",
     "metricsSubtitle": "Recall / Precision / Citation for this agent's eval cases",
+    "viewDashboard": "View full dashboard →",
+    "tracesPassed": "TRACES PASSED",
+    "scoringNote": "Scoring is mechanical — a finding counts when file matches and line ranges overlap. No model call in the scorer.",
     "casesHeading": "Eval cases",
+    "passingSummary": "{passed}/{total} passing",
+    "casesCount": "{count} cases",
+    "expectedGot": "expected {expected} finding, got {got}",
+    "mustFind": "MUST FIND",
+    "mustNotFlag": "MUST NOT FLAG",
+    "runAllEvals": "Run all evals",
+    "newCaseFull": "New eval case",
     "newCase": "New case",
     "loadingCases": "Loading cases…",
     "emptyCases": "No eval cases yet. Create one to assert this agent's expected findings on a sample diff.",
@@ -71,7 +111,9 @@
     "run": "Run",
     "running": "Running…",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "withSkill": "With skill {value}%",
+    "withoutSkill": "Without skill {value}%"
   },
   "page": {
     "crumbSkillsLab": "Skills Lab",

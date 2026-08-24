@@ -7,6 +7,7 @@ import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
 import { s } from "./styles";
 import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import type { EvalCaseDraft } from "@/components/EvalCaseEditor";
 import type { useCancelRun } from "@/lib/hooks/reviews";
 
 interface FindingsTabProps {
@@ -32,6 +33,8 @@ interface FindingsTabProps {
   focusFindingId?: string | null;
   /** Called once the focused finding has been revealed, so the param can clear. */
   onFindingFocused?: () => void;
+  /** Open the case editor seeded from a finding (owner = the finding's agent). */
+  onCreateEvalCase?: (draft: EvalCaseDraft) => void;
 }
 
 const SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
@@ -54,6 +57,7 @@ export function FindingsTab({
   onSetSeverity,
   focusFindingId,
   onFindingFocused,
+  onCreateEvalCase,
 }: FindingsTabProps) {
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
@@ -268,6 +272,7 @@ export function FindingsTab({
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
             severityFilter={severityFilter}
+            onCreateEvalCase={onCreateEvalCase}
           />
         ))
       )}

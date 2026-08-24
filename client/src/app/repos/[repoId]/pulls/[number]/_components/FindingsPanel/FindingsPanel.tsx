@@ -6,6 +6,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
+import type { EvalCaseDraft } from "@/components/EvalCaseEditor";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
@@ -18,6 +19,8 @@ export function FindingsPanel({
   repoFullName,
   headSha,
   severityFilter,
+  agentId,
+  onCreateEvalCase,
 }: {
   findings: FindingRecord[];
   prId: string;
@@ -25,6 +28,10 @@ export function FindingsPanel({
   headSha?: string | null;
   /** When set, only findings of this severity are shown (PR-page severity filter). */
   severityFilter?: string | null;
+  /** The owning review's agent — the eval-case owner (finding→run→agent, AC-4). */
+  agentId?: string | null;
+  /** Open the case editor seeded from a finding. */
+  onCreateEvalCase?: (draft: EvalCaseDraft) => void;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -76,6 +83,8 @@ export function FindingsPanel({
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}
+              agentId={agentId}
+              onCreateEvalCase={onCreateEvalCase}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
             />
           ))

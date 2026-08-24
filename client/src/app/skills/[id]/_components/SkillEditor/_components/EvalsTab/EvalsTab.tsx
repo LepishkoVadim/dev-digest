@@ -1,11 +1,9 @@
-/* Evals tab — stub. No runner, no data. */
+/* Evals tab — owner metrics + case rows + dashboard link for a skill owner. */
 "use client";
 
 import React from "react";
-import { useTranslations } from "next-intl";
-import { EmptyState } from "@devdigest/ui";
+import { OwnerEvalsPanel } from "@/components/OwnerEvalsPanel";
 
-export function EvalsTab() {
-  const t = useTranslations("skills");
-  return <EmptyState icon="FlaskConical" title={t("editor.evals.title")} body={t("editor.evals.body")} />;
+export function EvalsTab({ skillId }: { skillId: string }) {
+  return <OwnerEvalsPanel ownerKind="skill" ownerId={skillId} />;
 }

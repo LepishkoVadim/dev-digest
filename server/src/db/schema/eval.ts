@@ -32,6 +32,11 @@ export const evalRuns = pgTable('eval_runs', {
   citationAccuracy: doublePrecision('citation_accuracy'),
   durationMs: integer('duration_ms'),
   costUsd: doublePrecision('cost_usd'),
+  // Owner version in force at run time — references agent_versions.version /
+  // skill_versions.version (both composite-PK'd on (ownerId, version), so this
+  // is a plain int, NOT a FK; the repo resolves the snapshot). Nullable so
+  // pre-existing rows parse (AC-12/13, NFR-8).
+  version: integer('version'),
 });
 
 export const conformanceChecks = pgTable('conformance_checks', {

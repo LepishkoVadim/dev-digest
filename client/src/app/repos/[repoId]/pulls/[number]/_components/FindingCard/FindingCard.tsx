@@ -18,6 +18,7 @@ import {
   type Category,
 } from "@devdigest/ui";
 import type { FindingRecord, FindingActionKind } from "@devdigest/shared";
+import { seedFromFinding, type EvalCaseDraft } from "@/components/EvalCaseEditor";
 import { SEV_COLOR, SEV_COLOR_FALLBACK } from "./constants";
 import { lineLabel } from "./helpers";
 import { githubBlobUrl } from "../../../../../../../lib/github-urls";
@@ -31,6 +32,8 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  agentId,
+  onCreateEvalCase,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -39,6 +42,10 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** The owning review's agent — the eval-case owner (finding→run→agent). */
+  agentId?: string | null;
+  /** Open the case editor seeded from this finding (AC-4/5/6). */
+  onCreateEvalCase?: (draft: EvalCaseDraft) => void;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -109,6 +116,17 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
+            {onCreateEvalCase && agentId && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon="FlaskConical"
+                aria-label="Turn into eval case"
+                onClick={() => onCreateEvalCase(seedFromFinding(f, agentId))}
+              >
+                {t("finding.turnIntoEvalCase")}
+              </Button>
+            )}
           </div>
         </div>
       )}

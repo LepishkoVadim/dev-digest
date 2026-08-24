@@ -77,12 +77,97 @@ flowchart TB
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
   end
+  subgraph Evals["Evals (L06)"]
+    evals["evals<br/>/agents/:id/eval-runs · /skills/:id/eval-runs<br/>/evals/cases · /eval/:ownerId · /eval/:ownerId/version-text"]
+  end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]
     workspace["workspace<br/>/workspace"]
   end
   HEALTH["/health (liveness) · /health/ready (DB ping → 200/503)"]
 ```
+
+## Eval pipeline (L06)
+
+The `evals` module (`src/modules/evals/`) lets agent and skill owners build a
+labelled case set, run the real reviewer over it, and get deterministic scores
+back — with no LLM calls in the scoring step.
+
+```mermaid
+flowchart LR
+  CASES["eval_cases\n(per owner)"] --> EACH["for each case"]
+  EACH --> RP["reviewPullRequest\n(reviewer-core — real LLM call)"]
+  RP --> GF["groundFindings\n(diff-citation check)"]
+  GF --> SC["scoreCases\n(pure code, zero LLM)"]
+  SC --> PERSIST["eval_runs row\n(recall · precision · citation_accuracy · version)"]
+  PERSIST --> DASH["GET /eval/:ownerId\ndashboard aggregate"]
+```
+
+The diagram mirrors the execution path in `service.ts:runOwner` → `reviewOnce` →
+`scoring.ts:scoreCases` → `repository.ts:insertRun`.
+
+### Endpoints
+
+| Verb | Path | What it does |
+|------|------|--------------|
+| `GET` | `/agents/:id/eval-runs` | List all run records for an agent owner |
+| `POST` | `/agents/:id/eval-runs` | Execute the agent's full case set |
+| `GET` | `/skills/:id/eval-runs` | List all run records for a skill owner |
+| `POST` | `/skills/:id/eval-runs` | Execute the skill's case set (with/without — see below) |
+| `GET` | `/evals/cases` | List cases (query: `owner_kind`, `owner_id`) |
+| `POST` | `/evals/cases` | Create a case (422 if `expectation_kind` unset or `expected_output` invalid) |
+| `PUT` | `/evals/cases/:id` | Update a case |
+| `DELETE` | `/evals/cases/:id` | Delete a case |
+| `GET` | `/eval/:ownerId` | Dashboard aggregate (current metrics, delta vs previous run, trend) |
+| `GET` | `/eval/:ownerId/version-text` | Owner config snapshot at a version (feeds Compare modal) |
+
+### Scoring — pure code, no LLM
+
+`scoring.ts:scoreCases` is a standalone pure function. Three micro-averaged
+metrics over the pooled case set:
+
+- **recall** — over `must_find` cases only: matched expected / total expected.
+  Zero expected in the pool → 1.0 (vacuously complete).
+- **precision** — over all cases: matched actual / total actual. A
+  `must_not_flag` case contributes its actual findings to the denominator, so
+  every false positive lowers precision. Zero actuals → 1.0.
+- **citation_accuracy** — grounding survivors / total proposed (before
+  grounding). Zero proposed → 1.0.
+
+A finding matches an expected item when the file is equal **and** the
+`[start_line, end_line]` ranges overlap (inclusive; both sides are normalized
+with `min/max` before the test). No title, severity, or message is compared.
+
+`expectation_kind` (`must_find` | `must_not_flag`) is stored in
+`eval_cases.input_meta` jsonb (not a dedicated column), extracted by
+`helpers.ts:expectationKindOf` at run time.
+
+### Skill runs — with/without baseline
+
+When the owner is a skill, the service runs each case **twice** through the
+same linked agent: once with the skill's body injected and once without. The
+without-skill metrics (`recall`, `precision`, `citation_accuracy`, `cost_usd`)
+are stashed in the same `eval_runs` row's `actual_output` jsonb under the key
+`without_skill`. The primary row columns carry the with-skill metrics. The UI
+derives the "With X% / Without Y%" delta client-side from these two metric sets.
+
+### Run versioning
+
+Each `eval_runs` row carries a nullable `version` integer (migration
+`0016_chunky_yellow_claw.sql` — `ALTER TABLE "eval_runs" ADD COLUMN "version" integer`).
+The service stamps the owner's current `agents.version` or `skills.version`
+counter at run time. The `GET /eval/:ownerId/version-text` endpoint reads back
+the agent's `system_prompt` or the skill body from the corresponding version
+snapshot (`agent_versions` / `skill_versions`), which the Compare modal uses to
+diff config across runs.
+
+### Regression gate
+
+`pnpm verify:l06` (`server/scripts/verify-l06.ts`) is a fixture-based,
+zero-LLM, zero-DB gate. It calls `scoreCases` directly with fixed in-memory
+fixtures (both owner kinds, both expectation types, ≥ 8 cases) and asserts
+correct metric values plus a Proxy guard that throws if any code path during
+scoring ever touches an LLM provider object.
 
 ## Environment
 
