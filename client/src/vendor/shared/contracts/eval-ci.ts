@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Verdict, Finding } from './findings.js';
-import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowledge.js';
+import { EvalRun, EvalOwnerKind, ExpectationKind, Conformance, Provider, CiFailOn } from './knowledge.js';
 
 /**
  * A4 — Eval / CI / Compose / Conformance API contracts (L06).
@@ -24,10 +24,29 @@ export const EvalCaseInput = z.object({
   input_diff: z.string().default(''),
   input_files: z.unknown().nullish(),
   input_meta: z.unknown().nullish(),
+  // Authored expectation label. Optional on the wire so a partially-filled draft
+  // POSTs, but the service rejects an unset value with a 422 on save (AC-2).
+  expectation_kind: ExpectationKind.nullish(),
   expected_output: z.unknown(),
   notes: z.string().nullish(),
 });
 export type EvalCaseInput = z.infer<typeof EvalCaseInput>;
+/** Caller-facing input type — `.default()` fields stay optional (web hooks). */
+export type EvalCaseInputBody = z.input<typeof EvalCaseInput>;
+
+/**
+ * The without-skill baseline metric set stashed on a skill run's row (AC-10 /
+ * NFR-7). The primary `eval_runs` row carries the WITH-skill metrics; this quad
+ * lives in that row's `actual_output` jsonb under `without_skill`. The
+ * "With X% / Without Y%" pair + delta derive client-side.
+ */
+export const EvalWithoutSkill = z.object({
+  recall: z.number().nullable(),
+  precision: z.number().nullable(),
+  citation_accuracy: z.number().nullable(),
+  cost_usd: z.number().nullable(),
+});
+export type EvalWithoutSkill = z.infer<typeof EvalWithoutSkill>;
 
 /** A persisted eval run row (one execution of a case), returned by the API. */
 export const EvalRunRecord = z.object({
@@ -42,6 +61,10 @@ export const EvalRunRecord = z.object({
   citation_accuracy: z.number().nullable(),
   duration_ms: z.number().int().nullable(),
   cost_usd: z.number().nullable(),
+  // Owner version in force at run time — the `agent_versions.version` /
+  // `skill_versions.version` snapshot the Version column + Compare diff read
+  // from (AC-12/13). Nullable so pre-existing rows parse.
+  version: z.number().int().nullable(),
 });
 export type EvalRunRecord = z.infer<typeof EvalRunRecord>;
 
@@ -87,6 +110,17 @@ export const EvalDashboard = z.object({
   alert: z.string().nullable(),
 });
 export type EvalDashboard = z.infer<typeof EvalDashboard>;
+
+/**
+ * The owner's config snapshot text at a version — the agent's `system_prompt`
+ * (agent owner) or the skill body (skill owner). Feeds the Compare modal's
+ * prompt/skill diff (AC-17). `text` is null when no version snapshot exists.
+ */
+export const EvalVersionText = z.object({
+  version: z.number().int().nullable(),
+  text: z.string().nullable(),
+});
+export type EvalVersionText = z.infer<typeof EvalVersionText>;
 
 // ===========================================================================
 // Compose Review

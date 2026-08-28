@@ -8,6 +8,7 @@
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
 import type { ReviewRecord, Verdict } from "@devdigest/shared";
+import type { EvalCaseDraft } from "@/components/EvalCaseEditor";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
@@ -32,6 +33,7 @@ export function ReviewRunAccordion({
   targetRunId = null,
   targetNonce = 0,
   severityFilter,
+  onCreateEvalCase,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -44,6 +46,8 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** Open the case editor seeded from a finding (owner = this run's agent, AC-4). */
+  onCreateEvalCase?: (draft: EvalCaseDraft) => void;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -156,6 +160,8 @@ export function ReviewRunAccordion({
             repoFullName={repoFullName}
             headSha={headSha}
             severityFilter={severityFilter}
+            agentId={review.agent_id}
+            onCreateEvalCase={onCreateEvalCase}
           />
         </div>
       )}

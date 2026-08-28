@@ -16,6 +16,7 @@ notes live in the README (linked below) — this file is the map, not the docs.
 | Path | Purpose |
 |------|---------|
 | `src/modules/<name>/` | feature plugins (routes + service); registered in `src/modules/index.ts` |
+| `src/modules/evals/` | eval pipeline (L06): case CRUD, run execution, pure scoring, dashboard — see [README § Eval pipeline](#eval-pipeline-l06) |
 | `src/modules/repo-intel/` | codebase indexer → repo map (the **Indexed** badge) |
 | `src/adapters/*` | ports: llm · github · git · astgrep · tokenizer · secrets (+ `mocks.ts`) |
 | `src/platform/` | DI container, `config.ts` (`loadConfig`), error handler |

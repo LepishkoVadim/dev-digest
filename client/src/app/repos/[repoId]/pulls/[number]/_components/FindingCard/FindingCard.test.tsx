@@ -57,4 +57,24 @@ describe("FindingCard (smoke, both themes)", () => {
     fireEvent.click(screen.getByText("Dismiss"));
     expect(onAction).toHaveBeenCalledWith("dismiss");
   });
+
+  it("seeds an eval case from the finding's action state (AC-4/5/6)", () => {
+    const kindFor = (finding: FindingRecord) => {
+      const onCreateEvalCase = vi.fn();
+      renderWithIntl(
+        <FindingCard
+          f={finding}
+          defaultExpanded
+          agentId="ag1"
+          onCreateEvalCase={onCreateEvalCase}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /turn into eval case/i }));
+      cleanup();
+      return onCreateEvalCase.mock.calls[0]![0].expectation_kind;
+    };
+    expect(kindFor({ ...FINDING, accepted_at: "t" })).toBe("must_find");
+    expect(kindFor({ ...FINDING, dismissed_at: "t" })).toBe("must_not_flag");
+    expect(kindFor(FINDING)).toBeNull();
+  });
 });

@@ -21,7 +21,25 @@ import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } 
 import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
 import { ApiError } from "../../../../../lib/api";
 import { githubPrUrl } from "../../../../../lib/github-urls";
-import type { FindingRecord } from "@devdigest/shared";
+import { EvalCaseEditor, enrichDraftFromPr, type EvalCaseDraft } from "@/components/EvalCaseEditor";
+import { useCreateEvalCase, useUpdateEvalCase, useRunEvalCase } from "@/lib/hooks/evals";
+import { notify } from "@/lib/toast";
+import { useTranslations } from "next-intl";
+import type { EvalCaseInput, FindingRecord } from "@devdigest/shared";
+
+function toEvalCaseInput(draft: EvalCaseDraft): EvalCaseInput {
+  return {
+    owner_kind: draft.owner_kind,
+    owner_id: draft.owner_id,
+    name: draft.name,
+    input_diff: draft.input_diff,
+    input_files: draft.input_files ?? null,
+    input_meta: draft.input_meta ?? null,
+    expectation_kind: draft.expectation_kind,
+    expected_output: draft.expected_output,
+    notes: draft.notes,
+  };
+}
 
 export default function PRDetailPage() {
   const params = useParams<{ repoId: string; number: string }>();
@@ -56,6 +74,26 @@ export default function PRDetailPage() {
   const invalidateRunHistory = () => {
     if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
   };
+
+  // "Turn into eval case" seeds this draft from a finding (owner = the finding's
+  // agent, resolved in FindingCard via finding→run→agent). The editor hosts here
+  // so it survives accordion collapse/scroll.
+  const [caseDraft, setCaseDraft] = React.useState<EvalCaseDraft | null>(null);
+  const evalOwner = { kind: "agent" as const, id: caseDraft?.owner_id ?? "" };
+  const createCase = useCreateEvalCase(evalOwner);
+  const updateCase = useUpdateEvalCase(evalOwner);
+  const runEvalCase = useRunEvalCase(evalOwner);
+  const tEval = useTranslations("eval");
+
+  /** Persist the seeded draft — create when new, update once it has an id. */
+  async function persistCase(draft: EvalCaseDraft): Promise<string> {
+    if (draft.id) {
+      await updateCase.mutateAsync({ id: draft.id, input: toEvalCaseInput(draft) });
+      return draft.id;
+    }
+    const created = await createCase.mutateAsync(toEvalCaseInput(draft));
+    return created.id;
+  }
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
@@ -171,6 +209,7 @@ export default function PRDetailPage() {
             onSetSeverity={setSeverity}
             focusFindingId={search.get("finding")}
             onFindingFocused={() => setParam("finding", null)}
+            onCreateEvalCase={(draft) => setCaseDraft(enrichDraftFromPr(draft, pr))}
           />
         )}
 
@@ -183,6 +222,38 @@ export default function PRDetailPage() {
           />
         )}
       </div>
+
+      {caseDraft && (
+        <EvalCaseEditor
+          draft={caseDraft}
+          saving={createCase.isPending}
+          onClose={() => setCaseDraft(null)}
+          onSave={async (draft, opts) => {
+            try {
+              const id = await persistCase(draft);
+              if (opts.run) await runEvalCase.mutateAsync(id);
+              setCaseDraft(null);
+              notify.success(tEval("caseEditor.savedToast"));
+            } catch (e) {
+              notify.error(
+                e instanceof ApiError ? e.message : tEval("caseEditor.saveFailedToast"),
+              );
+            }
+          }}
+          onRunCase={async (draft) => {
+            try {
+              const id = await persistCase(draft);
+              setCaseDraft({ ...draft, id });
+              return await runEvalCase.mutateAsync(id);
+            } catch (e) {
+              notify.error(
+                e instanceof ApiError ? e.message : tEval("caseEditor.runFailedToast"),
+              );
+              return null;
+            }
+          }}
+        />
+      )}
 
       {prId && traceRunId && (
         <RunTraceDrawer

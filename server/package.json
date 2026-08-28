@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "arch:check": "depcruise src --config .dependency-cruiser.cjs",
+    "verify:l06": "tsx scripts/verify-l06.ts",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",

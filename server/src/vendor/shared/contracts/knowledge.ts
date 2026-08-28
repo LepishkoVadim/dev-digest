@@ -70,6 +70,38 @@ export type EvalRun = z.infer<typeof EvalRun>;
 export const EvalOwnerKind = z.enum(['skill', 'agent']);
 export type EvalOwnerKind = z.infer<typeof EvalOwnerKind>;
 
+/**
+ * The case-level expectation label (L06). Stored in `eval_cases.input_meta`
+ * (jsonb), not a dedicated column — see the spec's Storage decision Q1. Drives
+ * the editor badge / list label and the scoring split (recall pools over
+ * `must_find` cases; `must_not_flag` cases exercise precision only).
+ */
+export const ExpectationKind = z.enum(['must_find', 'must_not_flag']);
+export type ExpectationKind = z.infer<typeof ExpectationKind>;
+
+/**
+ * One expected finding in a case's `expected_output` — the mechanical match
+ * target. Only file + line range are read (no title/severity is trusted from
+ * the author). `start_line <= end_line` is not enforced here: the scoring match
+ * rule normalizes the range (min/max) before the overlap test.
+ */
+export const ExpectedFinding = z.object({
+  file: z.string().min(1),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  // Display-only hints carried from the seeding finding (severity/category chip
+  // + row title on the Evals tab). The mechanical scorer ignores them — matching
+  // is file + line overlap only — so they stay optional and never affect metrics.
+  severity: z.string().nullish(),
+  category: z.string().nullish(),
+  title: z.string().nullish(),
+});
+export type ExpectedFinding = z.infer<typeof ExpectedFinding>;
+
+/** The `expected_output` gate — a strict array of ExpectedFinding (AC-16). */
+export const ExpectedFindings = z.array(ExpectedFinding);
+export type ExpectedFindings = z.infer<typeof ExpectedFindings>;
+
 export const EvalCase = z.object({
   id: z.string(),
   owner_kind: EvalOwnerKind,
@@ -78,6 +110,9 @@ export const EvalCase = z.object({
   input_diff: z.string(),
   input_files: z.unknown(),
   input_meta: z.unknown(),
+  // Authored expectation label, surfaced from `input_meta.expectation_kind`.
+  // Nullish so a legacy row without the label parses (and reads as "unset").
+  expectation_kind: ExpectationKind.nullish(),
   expected_output: z.unknown(),
   notes: z.string().nullish(),
 });

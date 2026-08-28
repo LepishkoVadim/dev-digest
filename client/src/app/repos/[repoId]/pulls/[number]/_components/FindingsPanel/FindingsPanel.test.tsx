@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
@@ -53,6 +53,26 @@ describe("FindingsPanel (smoke)", () => {
   it("shows the empty state when nothing matches", () => {
     renderWithIntl(<FindingsPanel findings={[]} prId="pr1" />);
     expect(screen.getByText("No findings match")).toBeInTheDocument();
+  });
+
+  it("wires the eval-case button to the finding's agent when agentId + handler are passed (AC-4)", () => {
+    const onCreateEvalCase = vi.fn();
+    renderWithIntl(
+      <FindingsPanel
+        findings={FINDINGS}
+        prId="pr1"
+        agentId="ag-42"
+        onCreateEvalCase={onCreateEvalCase}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /turn into eval case/i }));
+    expect(onCreateEvalCase).toHaveBeenCalledTimes(1);
+    expect(onCreateEvalCase.mock.calls[0]![0].owner_id).toBe("ag-42");
+  });
+
+  it("omits the eval-case button when no agent/handler is supplied", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    expect(screen.queryByRole("button", { name: /turn into eval case/i })).not.toBeInTheDocument();
   });
 
   it("severityFilter shows only findings of that severity", () => {
